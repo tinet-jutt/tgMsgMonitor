@@ -1,0 +1,31 @@
+# Telegram 消息监控系统实施任务列表
+
+- `[x]` 步骤 1: 编写依赖配置文件 `requirements.txt`
+- `[x]` 步骤 2: 初始化本地配置文件 `config.json` 的空模版
+- `[x]` 步骤 3: 编写核心后端逻辑 `app/backend.py`
+  - `[x]` 配置文件读写与并发锁
+  - `[x]` 多账号 TelegramClient 实例生命周期管理
+  - `[x]` 网页端多步登录状态机 API
+  - `[x]` 消息事件监听、多规则匹配与过滤
+  - `[x]` 异步 Webhook 触发与重试机制
+- `[x]` 步骤 4: 编写 Web 前端单页面应用 `app/static/index.html`
+  - `[x]` 页面基础布局（Tailwind CSS 暗色科技风格）
+  - `[x]` 多账号管理面板与分步登录引导模态框
+  - `[x]` 监控规则展示列表与一键 Toggle 状态
+  - `[x]` 规则创建/编辑的模态表单（支持 Tag 关键字、多账号关联）
+  - `[x]` 前端状态轮询与 API 对接（Alpine.js 逻辑）
+- `[x]` 步骤 5: 编写主入口 `main.py`
+  - `[x]` 创建静态文件挂载与 FastAPI 实例
+  - `[x]` 启动时自动拉起所有已激活账号的监听
+- `[x]` 步骤 6: 编写说明文档 `README.md`
+- `[x]` 步骤 7: 进行逻辑与静态校验
+- `[x]` 步骤 8: Webhook 占位符与 GET/POST 支持升级
+- `[x]` 步骤 9: Bug 修复、自定义 POST Body 与 Webhook 测试及帮助弹窗升级
+- `[x]` 步骤 10: 管理员口令鉴权系统与 Host 自定义配置升级
+  - `[x]` 在 `backend.py` 中增加 `admin_password` 与 `server` 字段，并在 ConfigManager 中支持默认写入
+  - `[x]` 在 `backend.py` 中编写 `verify_token` 拦截器依赖，并挂载至所有核心 API
+  - `[x]` 在 `backend.py` 中编写 `POST /api/auth/login` 与 `POST /api/auth/change-password` 接口
+  - `[x]` 在 `index.html` 中编写全屏登录遮罩，未登录状态锁定页面
+  - `[x]` 在 `index.html` 中编写 `apiFetch` 拦截器，自动携带 Token 并处理 `401` 自动退登，提供密码修改选项
+  - `[x]` 在 `main.py` 中支持从配置或参数读取 host/port，默认绑定为 `0.0.0.0:8010` (因 8000 端口冲突，调整为 8010)
+  - `[x]` 运行本地静态编译测试，确保后端 100% 编译通过，并运行后台开发服务器

@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram 消息监控系统 - 管理后台</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Alpine.js CDN -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#090d16',
+              card: '#121824',
+              border: '#1f293d',
+              accent: '#6366f1',
+              accentHover: '#4f46e5'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6366f1;
+    }
+  </style>
+</head>
+<body class="bg-brand-dark text-gray-100 antialiased" x-data="appState()">
+
+  <!-- 管理员安全鉴权登录遮罩 -->
+  <div x-show="!isLoggedIn" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-brand-dark/95 backdrop-blur-md">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-8 shadow-2xl space-y-6">
+      <div class="text-center space-y-2">
+        <div class="inline-flex p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
+          <i data-lucide="lock" class="w-8 h-8"></i>
+        </div>
+        <h1 class="text-xl font-bold text-white tracking-wide" x-text="t('auth_title')"></h1>
+        <p class="text-xs text-gray-500" x-text="t('auth_subtitle')"></p>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_admin_pwd')"></label>
+          <input type="password" x-model="adminPasswordInput" @keydown.enter="loginAdmin()" :placeholder="t('ph_admin_pwd')" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition text-center tracking-widest">
+        </div>
+        <button @click="loginAdmin()" :disabled="loggingIn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+          <i data-lucide="key-round" class="w-4 h-4" x-show="!loggingIn"></i>
+          <span x-show="!loggingIn" x-text="t('btn_login')"></span>
+          <span x-show="loggingIn" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+        </button>
+      </div>
+      <div class="text-center">
+        <p class="text-[10px] text-gray-600" x-text="t('login_hint')"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面顶部导航栏 -->
+  <header class="border-b border-brand-border bg-brand-card/80 backdrop-blur-md sticky top-0 z-40" x-show="isLoggedIn" x-cloak>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="eye" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white tracking-wide" x-text="t('app_title')"></h1>
+          <p class="text-xs text-gray-400" x-text="t('app_subtitle')"></p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span x-text="t('sys_online')"></span>
+        </span>
+        <!-- 语言切换按钮 -->
+        <button @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" title="Switch Language">
+          <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+          <span x-text="lang === 'zh' ? 'English' : '简体中文'"></span>
+        </button>
+        <!-- 安全密码修改按钮 -->
+        <button @click="showPwdModal = true" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" :title="t('btn_pwd')">
+          <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+          <span x-text="t('btn_pwd')"></span>
+        </button>
+        <button @click="refreshData()" :disabled="refreshing" class="p-2 text-gray-400 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition disabled:opacity-50 flex items-center justify-center" :title="t('btn_refresh')">
+          <span :class="refreshing ? 'animate-spin block' : 'block'">
+            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体区域 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-show="isLoggedIn" x-cloak>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- 左栏：账号管理 (1/3 宽度) -->
+      <div class="lg:col-span-1 space-y-6">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i>
+              <h2 class="text-md font-bold text-white" x-text="t('card_accounts')"></h2>
+            </div>
+            <button @click="openLoginModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/10 flex items-center space-x-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span x-text="t('btn_add_account')"></span>
+            </button>
+          </div>
+
+          <!-- 账号列表 -->
+          <div class="space-y-4">
+            <template x-if="accounts.length === 0">
+              <div class="text-center py-8 border border-dashed border-brand-border rounded-xl">
+                <i data-lucide="user-minus" class="w-8 h-8 text-gray-600 mx-auto mb-2"></i>
+                <p class="text-sm text-gray-500" x-text="lang === 'zh' ? '暂无关联 Telegram 账号' : 'No linked Telegram accounts'"></p>
+                <p class="text-xs text-gray-600 mt-1" x-text="lang === 'zh' ? '点击“添加账号”启动监听' : 'Click Link Account to start monitoring'"></p>
+              </div>
+            </template>
+            
+            <template x-for="acc in accounts" :key="acc.phone">
+              <div class="p-4 bg-brand-dark/50 border border-brand-border hover:border-brand-border/80 rounded-xl flex items-center justify-between transition group">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center" 
+                       :class="acc.status === 'online' ? 'bg-emerald-500/10 text-emerald-400' : acc.status === 'logging_in' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'">
+                    <i data-lucide="send" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <div class="text-sm font-semibold text-white" x-text="acc.phone"></div>
+                    <div class="flex items-center space-x-1.5 mt-0.5">
+                      <span class="w-1.5 h-1.5 rounded-full" 
+                            :class="acc.status === 'online' ? 'bg-emerald-400' : acc.status === 'logging_in' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"></span>
+                      <span class="text-xs text-gray-400" 
+                            x-text="acc.status === 'online' ? t('acc_status_online') : acc.status === 'logging_in' ? t('acc_status_logging') : t('acc_status_offline')"></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <!-- 删除账号确认 -->
+                  <div x-data="{ confirmDelete: false }" class="relative">
+                    <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-1.5 py-0.5 text-[10px]">
+                      <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
+                      <button @click="deleteAccount(acc.phone)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                      <button @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 全局配置面板 -->
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
+              <h2 class="text-md font-bold text-white" x-text="t('card_webhook')"></h2>
+            </div>
+            <!-- 帮助问号说明链接按钮 -->
+            <button @click="showHelpModal = true" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+              <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
+            </button>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
+              <input type="url" x-model="globalWebhook.url" placeholder="https://api.example.com/webhook" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition">
+              <p class="text-[11px] text-gray-500 mt-1" x-text="t('webhook_hint')"></p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_method')"></label>
+              <select x-model="globalWebhook.method" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition bg-brand-dark">
+                <option value="POST">POST (发送完整 JSON Body)</option>
+                <option value="GET">GET (参数拼接/URL占位符)</option>
+              </select>
+            </div>
+            <div x-show="globalWebhook.method === 'POST'">
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_custom_body')"></label>
+              <textarea x-model="globalWebhook.custom_body" rows="3" placeholder='{"text": "{text}", "sender": "{sender_name}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
+              <p class="text-[10px] text-gray-500 mt-1" x-text="t('custom_body_hint')"></p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_timeout')"></label>
+              <input type="number" x-model.number="globalWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <button @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingWebhook"></i>
+                <span x-show="!testingWebhook" x-text="t('btn_test_conn')"></span>
+                <span x-show="testingWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+              <button @click="saveGlobalWebhook()" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span x-text="t('btn_save_config')"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右栏：监控规则 (2/3 宽度) -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="shield-alert" class="w-5 h-5 text-indigo-400"></i>
+              <h2 class="text-md font-bold text-white" x-text="t('card_rules')"></h2>
+            </div>
+            <button @click="openRuleModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/20 flex items-center space-x-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span x-text="t('btn_new_rule')"></span>
+            </button>
+          </div>
+
+          <!-- 规则列表 -->
+          <div class="space-y-6">
+            <template x-if="rules.length === 0">
+              <div class="text-center py-16 border border-dashed border-brand-border rounded-xl">
+                <i data-lucide="alert-circle" class="w-10 h-10 text-gray-600 mx-auto mb-3"></i>
+                <h3 class="text-sm font-semibold text-gray-400" x-text="lang === 'zh' ? '暂无监控规则' : 'No rules created'"></h3>
+                <p class="text-xs text-gray-500 mt-1 max-w-sm mx-auto" x-text="lang === 'zh' ? '添加规则来设定需要监听哪些会话（群组、频道、机器人），以及需要筛选的关键字词汇。' : 'Add rules to specify which chats (groups, channels, bots) to monitor, and filters to match.'"></p>
+              </div>
+            </template>
+
+            <template x-for="rule in rules" :key="rule.id">
+              <div class="border border-brand-border hover:border-brand-border/80 rounded-xl p-5 bg-brand-dark/20 transition relative" :class="!rule.is_enabled ? 'opacity-60' : ''">
+                <!-- 头部状态栏 -->
+                <div class="flex items-start justify-between mb-4">
+                  <div class="space-y-1">
+                    <div class="flex items-center space-x-2">
+                      <span class="text-md font-bold text-white" x-text="rule.name"></span>
+                      <span x-show="rule.filters.use_regex" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" x-text="t('rule_regex_active')"></span>
+                    </div>
+                    <!-- 绑定账号列表 -->
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <span class="text-xs text-gray-500" x-text="lang === 'zh' ? '执行账号:' : 'Accounts:'"></span>
+                      <template x-if="rule.accounts.includes('all') || rule.accounts.length === 0">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20" x-text="lang === 'zh' ? '所有账号' : 'All accounts'"></span>
+                      </template>
+                      <template x-if="!rule.accounts.includes('all')">
+                        <template x-for="p in rule.accounts" :key="p">
+                          <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-gray-300 font-medium" x-text="p"></span>
+                        </template>
+                      </template>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3">
+                    <!-- Toggle 开关 -->
+                    <button @click="toggleRule(rule.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                            :class="rule.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+                      <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                           :class="rule.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+                    </button>
+
+                    <!-- 删除与编辑 -->
+                    <div class="flex items-center space-x-1.5 border-l border-brand-border pl-3">
+                      <button @click="openRuleModal(rule)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                      
+                      <!-- 删除确认 -->
+                      <div x-data="{ confirmDelete: false }" class="relative">
+                        <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                        <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-2 py-1 text-xs">
+                          <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
+                          <button @click="deleteRule(rule.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                          <button @click="confirmDelete = false" class="text-gray-400 hover:underline" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 监控详情配置 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-brand-dark/40 p-4 rounded-lg border border-brand-border/40">
+                  <div class="space-y-2">
+                    <div>
+                      <span class="text-gray-500 font-medium block mb-1">🎯 <span x-text="lang === 'zh' ? '监听目标聊天 (Chats)' : 'Listen Target Chats'"></span></span>
+                      <div class="flex flex-wrap gap-1.5">
+                        <template x-for="t in rule.targets" :key="t">
+                          <span class="px-2 py-0.5 bg-brand-border rounded text-gray-300 font-semibold" x-text="t"></span>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="space-y-2">
+                    <div>
+                      <span class="text-gray-500 font-medium block mb-1">🔍 <span x-text="lang === 'zh' ? '匹配关键字 (Keywords)' : 'Matching Filters'"></span></span>
+                      <div class="flex flex-wrap gap-1.5">
+                        <template x-if="rule.filters.keywords.length === 0">
+                          <span class="text-emerald-400 font-medium" x-text="lang === 'zh' ? '📢 监听全部消息 (全量)' : '📢 Forwarding All Messages'"></span>
+                        </template>
+                        <template x-for="kw in rule.filters.keywords" :key="kw">
+                          <span class="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded font-semibold" x-text="kw"></span>
+                        </template>
+                      </div>
+                    </div>
+                    
+                    <template x-if="rule.filters.exclude_keywords.length > 0">
+                      <div class="mt-2">
+                        <span class="text-gray-500 font-medium block mb-1">🚫 <span x-text="lang === 'zh' ? '排除关键字 (Blocklist)' : 'Exclude Keywords'"></span></span>
+                        <div class="flex flex-wrap gap-1.5">
+                          <template x-for="ex in rule.filters.exclude_keywords" :key="ex">
+                            <span class="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/10 rounded line-through" x-text="ex"></span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- 专属 Webhook 展示 -->
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 pl-1">
+                  <div class="flex items-center space-x-1.5 truncate max-w-md">
+                    <i data-lucide="link" class="w-3.5 h-3.5 text-gray-500"></i>
+                    <span>Webhook:</span>
+                    <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold" x-text="rule.webhook.url ? (rule.webhook.method || 'POST') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
+                    <span class="truncate text-indigo-300 font-mono" x-text="rule.webhook.url || (lang === 'zh' ? '使用全局 Webhook URL' : 'Using Global Webhook')"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 模态框 1：Telegram 账号登录 -->
+  <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeLoginModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+      <button @click="closeLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+        <i data-lucide="send" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="t('modal_login_title')"></span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-6" x-text="lang === 'zh' ? '请输入 Telegram API 凭据进行交互式连接，登录凭据将加密保存在本地安全 Session 中。' : 'Please input Telegram API credentials for interactive authorization. Session will be securely stored in the local server.'"></p>
+
+      <div class="space-y-4">
+        <!-- 错误提示 -->
+        <template x-if="loginError">
+          <div class="p-3 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-xs" x-text="loginError"></div>
+        </template>
+
+        <!-- 阶段一：配置 API 凭证并发送验证码 -->
+        <div x-show="loginStep === 1" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_phone')"></label>
+            <input type="text" x-model="loginForm.phone" placeholder="+8613800000000" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API ID</label>
+              <input type="number" x-model.number="loginForm.api_id" placeholder="123456" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API Hash</label>
+              <input type="text" x-model="loginForm.api_hash" placeholder="your_hash" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+            </div>
+          </div>
+          <button @click="sendCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+            <span x-show="!submittingLogin" x-text="t('btn_get_code')"></span>
+            <span x-show="submittingLogin" class="flex items-center space-x-2">
+              <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span x-text="lang === 'zh' ? '连接中...' : 'Connecting...'"></span>
+            </span>
+          </button>
+        </div>
+
+        <!-- 阶段二：输入验证码 -->
+        <div x-show="loginStep === 2" class="space-y-4">
+          <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-xs flex items-center space-x-2">
+            <i data-lucide="info" class="w-4 h-4"></i>
+            <span x-text="lang === 'zh' ? '验证码已成功发往您的 Telegram 客户端。' : 'Verification code has been sent to your Telegram client.'"></span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_sms_code')"></label>
+            <input type="text" x-model="loginForm.code" :placeholder="lang === 'zh' ? '输入验证码' : 'Enter SMS Code'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white tracking-widest text-center font-bold">
+          </div>
+          <button @click="verifyCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+            <span x-show="!submittingLogin" x-text="t('btn_verify_code')"></span>
+            <span x-show="submittingLogin" class="flex items-center space-x-2">
+              <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span x-text="lang === 'zh' ? '验证中...' : 'Verifying...'"></span>
+            </span>
+          </button>
+          <button @click="loginStep = 1; loginError = ''" class="w-full py-2 bg-transparent text-gray-400 hover:text-white rounded-lg text-xs transition" x-text="lang === 'zh' ? '返回上一步' : 'Go Back'"></button>
+        </div>
+
+        <!-- 阶段三：输入两步验证密码 -->
+        <div x-show="loginStep === 3" class="space-y-4">
+          <div class="p-3 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg text-xs flex items-center space-x-2">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+            <span x-text="lang === 'zh' ? '该账号已启用两步验证 (2FA)，请输入您的账户密码。' : 'This account has 2FA enabled. Please enter your two-step verification password.'"></span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_2fa_pwd')"></label>
+            <input type="password" x-model="loginForm.password" :placeholder="lang === 'zh' ? '输入密码' : 'Enter 2FA Password'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+          </div>
+          <button @click="verify2FA()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+            <span x-show="!submittingLogin" x-text="t('btn_verify_2fa')"></span>
+            <span x-show="submittingLogin" class="flex items-center space-x-2">
+              <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span x-text="lang === 'zh' ? '验证中...' : 'Verifying...'"></span>
+            </span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框 2：规则添加/编辑 -->
+  <div x-show="showRuleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeRuleModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <button @click="closeRuleModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white mb-6 flex items-center space-x-2">
+        <i data-lucide="shield-alert" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="ruleForm.isEdit ? (lang === 'zh' ? '编辑监控规则' : 'Edit Monitoring Rule') : (lang === 'zh' ? '创建监控规则' : 'Create Monitoring Rule')"></span>
+      </h3>
+
+      <div class="space-y-5">
+        <!-- 规则名称 -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_rule_name')"></label>
+          <input type="text" x-model="ruleForm.name" :placeholder="lang === 'zh' ? '例如: 招聘关键字监听' : 'e.g. Job Recruitment Monitor'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+        </div>
+
+        <!-- 绑定执行账号 -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bind_accounts')"></label>
+          <div class="flex flex-wrap gap-3 p-3 bg-brand-dark rounded-lg border border-brand-border">
+            <label class="inline-flex items-center space-x-2 text-sm cursor-pointer">
+              <input type="checkbox" x-model="ruleForm.bindAll" @change="handleBindAllChange()" class="rounded border-brand-border text-indigo-600 focus:ring-indigo-500 bg-brand-dark">
+              <span class="text-indigo-400 font-semibold" x-text="t('lbl_bind_all')"></span>
+            </label>
+            <template x-for="acc in accounts" :key="acc.phone">
+              <label class="inline-flex items-center space-x-2 text-sm cursor-pointer" x-show="!ruleForm.bindAll">
+                <input type="checkbox" :value="acc.phone" x-model="ruleForm.accounts" class="rounded border-brand-border text-indigo-600 focus:ring-indigo-500 bg-brand-dark">
+                <span x-text="acc.phone"></span>
+              </label>
+            </template>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1" x-text="lang === 'zh' ? '仅勾选的账号会在收到消息时应用此过滤规则。' : 'Only selected accounts will apply this filtering logic upon message arrival.'"></p>
+        </div>
+
+        <!-- 监听目标 chats -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_targets_field')"></label>
+          <textarea x-model="ruleForm.targetsText" rows="3" placeholder="@job_channel_demo&#10;-100123456789&#10;https://t.me/another_group" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono"></textarea>
+          <p class="text-[11px] text-gray-500 mt-1" x-text="t('targets_hint')"></p>
+        </div>
+
+        <!-- 过滤匹配模式 -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_filter_mode')"></label>
+          <div class="grid grid-cols-2 gap-4">
+            <label class="flex items-center justify-between p-3 bg-brand-dark rounded-lg border cursor-pointer transition"
+                   :class="ruleForm.filterMode === 'all' ? 'border-indigo-500/50 bg-indigo-500/5 text-white' : 'border-brand-border text-gray-400'">
+              <div class="flex items-center space-x-2">
+                <input type="radio" value="all" x-model="ruleForm.filterMode" class="text-indigo-600 focus:ring-indigo-500 bg-brand-dark">
+                <span class="text-sm font-semibold" x-text="t('rule_filter_all')"></span>
+              </div>
+            </label>
+            <label class="flex items-center justify-between p-3 bg-brand-dark rounded-lg border cursor-pointer transition"
+                   :class="ruleForm.filterMode === 'keywords' ? 'border-indigo-500/50 bg-indigo-500/5 text-white' : 'border-brand-border text-gray-400'">
+              <div class="flex items-center space-x-2">
+                <input type="radio" value="keywords" x-model="ruleForm.filterMode" class="text-indigo-600 focus:ring-indigo-500 bg-brand-dark">
+                <span class="text-sm font-semibold" x-text="t('rule_filter_kw')"></span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 关键字输入 (按关键字过滤模式时展示) -->
+        <div x-show="ruleForm.filterMode === 'keywords'" class="space-y-4 border-l-2 border-indigo-500/30 pl-4 py-1" x-cloak>
+          <!-- 匹配关键字 Tag Input -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_kw_must')"></label>
+            <div class="w-full min-h-[42px] px-3 py-2 bg-brand-dark border border-brand-border rounded-lg flex flex-wrap items-center gap-1.5 focus-within:border-indigo-500">
+              <template x-for="(tag, index) in ruleForm.keywords" :key="index">
+                <span class="inline-flex items-center px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded text-xs font-medium">
+                  <span x-text="tag"></span>
+                  <button @click="ruleForm.keywords.splice(index, 1)" class="ml-1 text-indigo-400 hover:text-indigo-200 focus:outline-none">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                </span>
+              </template>
+              <input type="text" x-model="tempKeyword" @keydown.enter.prevent="if(tempKeyword.trim()){ ruleForm.keywords.push(tempKeyword.trim()); tempKeyword = ''; }" @blur="if(tempKeyword.trim()){ ruleForm.keywords.push(tempKeyword.trim()); tempKeyword = ''; }" :placeholder="lang === 'zh' ? '添加标签...' : 'Add tag...'" class="flex-grow bg-transparent focus:outline-none text-sm text-white min-w-[100px]">
+            </div>
+          </div>
+
+          <!-- 排除关键字 Tag Input -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_kw_exclude')"></label>
+            <div class="w-full min-h-[42px] px-3 py-2 bg-brand-dark border border-brand-border rounded-lg flex flex-wrap items-center gap-1.5 focus-within:border-indigo-500">
+              <template x-for="(tag, index) in ruleForm.exclude_keywords" :key="index">
+                <span class="inline-flex items-center px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-xs font-medium line-through">
+                  <span x-text="tag"></span>
+                  <button @click="ruleForm.exclude_keywords.splice(index, 1)" class="ml-1 text-red-400 hover:text-red-200 focus:outline-none">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                </span>
+              </template>
+              <input type="text" x-model="tempExcludeKeyword" @keydown.enter.prevent="if(tempExcludeKeyword.trim()){ ruleForm.exclude_keywords.push(tempExcludeKeyword.trim()); tempExcludeKeyword = ''; }" @blur="if(tempExcludeKeyword.trim()){ ruleForm.exclude_keywords.push(tempExcludeKeyword.trim()); tempExcludeKeyword = ''; }" :placeholder="lang === 'zh' ? '添加排除标签...' : 'Add exclude tag...'" class="flex-grow bg-transparent focus:outline-none text-sm text-white min-w-[100px]">
+            </div>
+          </div>
+
+          <!-- 正则开关 -->
+          <div class="flex items-center justify-between py-2 border-t border-brand-border/40">
+            <div>
+              <span class="text-xs font-semibold text-gray-300 block" x-text="t('lbl_regex_enable')"></span>
+              <span class="text-[10px] text-gray-500" x-text="t('regex_hint')"></span>
+            </div>
+            <button @click="ruleForm.use_regex = !ruleForm.use_regex" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                    :class="ruleForm.use_regex ? 'bg-indigo-600' : 'bg-gray-700'">
+              <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                   :class="ruleForm.use_regex ? 'translate-x-4' : 'translate-x-0'"></div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 覆盖 Webhook -->
+        <div class="border-t border-brand-border pt-4">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2 flex-wrap">
+              <span class="text-xs font-semibold text-gray-300 block" x-text="t('lbl_override_webhook')"></span>
+              <span class="text-[10px] text-gray-500 mr-2" x-text="t('override_hint')"></span>
+              <button @click="showHelpModal = true" class="px-1.5 py-0.5 text-[10px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+                <i data-lucide="help-circle" class="w-3 h-3"></i>
+                <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
+              </button>
+            </div>
+            <button @click="ruleForm.overrideWebhook = !ruleForm.overrideWebhook" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                    :class="ruleForm.overrideWebhook ? 'bg-indigo-600' : 'bg-gray-700'">
+              <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                   :class="ruleForm.overrideWebhook ? 'translate-x-4' : 'translate-x-0'"></div>
+            </button>
+          </div>
+          <div x-show="ruleForm.overrideWebhook" x-cloak class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_dedicated_url')"></label>
+              <input type="url" x-model="ruleForm.webhookUrl" placeholder="https://api.example.com/dedicated-webhook" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_dedicated_method')"></label>
+              <select x-model="ruleForm.webhookMethod" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition bg-brand-dark">
+                <option value="" x-text="t('method_inherit')"></option>
+                <option value="POST">POST (发送完整 JSON Body)</option>
+                <option value="GET">GET (参数拼接/URL占位符)</option>
+              </select>
+            </div>
+            <div x-show="ruleForm.webhookMethod === 'POST' || (ruleForm.webhookMethod === '' && globalWebhook.method === 'POST')">
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_dedicated_body')"></label>
+              <textarea x-model="ruleForm.webhookCustomBody" rows="3" placeholder='{"text": "{text}", "sender": "{sender_name}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
+            </div>
+            <!-- 测试此专属按钮 -->
+            <div class="flex justify-end pt-1">
+              <button @click="testWebhook('rule')" :disabled="testingWebhook" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg transition text-xs flex items-center space-x-1.5 disabled:opacity-50 shadow-sm">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-indigo-400" x-show="!testingWebhook"></i>
+                <span x-show="!testingWebhook" x-text="t('btn_test_dedicated')"></span>
+                <span x-show="testingWebhook" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提交动作栏 -->
+        <div class="flex items-center justify-end space-x-3 border-t border-brand-border pt-4">
+          <button @click="closeRuleModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white bg-transparent hover:bg-brand-border rounded-lg transition">取消</button>
+          <button @click="saveRule()" class="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition flex items-center space-x-2">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>保存规则</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 占位符帮助说明弹窗 -->
+  <div x-show="showHelpModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showHelpModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+      <button @click="showHelpModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
+        <i data-lucide="help-circle" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="t('modal_help_title')"></span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-4 leading-relaxed" x-text="t('help_desc')"></p>
+
+      <div class="border border-brand-border rounded-xl overflow-hidden text-xs bg-brand-dark/30">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-brand-border/30 text-gray-300 font-bold border-b border-brand-border">
+              <th class="p-3 w-1/3" x-text="t('lbl_placeholder_th')"></th>
+              <th class="p-3" x-text="t('lbl_meaning_th')"></th>
+              <th class="p-3" x-text="t('lbl_example_th')"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-brand-border text-gray-400">
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{text}'); showToast(lang === 'zh' ? '已复制 {text}' : 'Copied {text}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{text}</span></td>
+              <td class="p-3" x-text="t('placeholder_text_desc')"></td>
+              <td class="p-3" x-text="lang === 'zh' ? '招募远程 Python 开发' : 'Looking for remote python developers'"></td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{sender_name}'); showToast(lang === 'zh' ? '已复制 {sender_name}' : 'Copied {sender_name}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{sender_name}</span></td>
+              <td class="p-3" x-text="t('placeholder_sender_name_desc')"></td>
+              <td class="p-3">Bob Smith</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{sender_username}'); showToast(lang === 'zh' ? '已复制 {sender_username}' : 'Copied {sender_username}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{sender_username}</span></td>
+              <td class="p-3" x-text="t('placeholder_sender_username_desc')"></td>
+              <td class="p-3">recruiter_bob</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{chat_title}'); showToast(lang === 'zh' ? '已复制 {chat_title}' : 'Copied {chat_title}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{chat_title}</span></td>
+              <td class="p-3" x-text="t('placeholder_chat_title_desc')"></td>
+              <td class="p-3" x-text="lang === 'zh' ? '远程工作交流群' : 'Remote Job Exchange'"></td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{receiver_account}'); showToast(lang === 'zh' ? '已复制 {receiver_account}' : 'Copied {receiver_account}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{receiver_account}</span></td>
+              <td class="p-3" x-text="t('placeholder_receiver_account_desc')"></td>
+              <td class="p-3">+8613800000000</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{matched_keywords}'); showToast(lang === 'zh' ? '已复制 {matched_keywords}' : 'Copied {matched_keywords}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{matched_keywords}</span></td>
+              <td class="p-3" x-text="t('placeholder_matched_keywords_desc')"></td>
+              <td class="p-3">remote,python</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{msg_id}'); showToast(lang === 'zh' ? '已复制 {msg_id}' : 'Copied {msg_id}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{msg_id}</span></td>
+              <td class="p-3" x-text="t('placeholder_msg_id_desc')"></td>
+              <td class="p-3">14205</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{chat_id}'); showToast(lang === 'zh' ? '已复制 {chat_id}' : 'Copied {chat_id}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{chat_id}</span></td>
+              <td class="p-3" x-text="t('placeholder_chat_id_desc')"></td>
+              <td class="p-3">-100123456789</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{sender_id}'); showToast(lang === 'zh' ? '已复制 {sender_id}' : 'Copied {sender_id}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{sender_id}</span></td>
+              <td class="p-3" x-text="t('placeholder_sender_id_desc')"></td>
+              <td class="p-3">987654321</td>
+            </tr>
+            <tr>
+              <td class="p-3"><span @click="navigator.clipboard.writeText('{date}'); showToast(lang === 'zh' ? '已复制 {date}' : 'Copied {date}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{date}</span></td>
+              <td class="p-3" x-text="t('placeholder_date_desc')"></td>
+              <td class="p-3">2026-07-11T21:48:47+08:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button @click="showHelpModal = false" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭帮助' : 'Close'"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Webhook 测试结果诊断弹窗 -->
+  <div x-show="showTestResultModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showTestResultModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
+      <button @click="showTestResultModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
+        <i data-lucide="terminal" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="t('modal_test_title')"></span>
+      </h3>
+
+      <div class="space-y-4 text-xs">
+        <div class="p-4 rounded-xl border flex items-center justify-between"
+             :class="testResult.status === 'success' ? (testResult.code >= 200 && testResult.code < 300 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400') : 'bg-red-500/10 border-red-500/20 text-red-400'">
+          <div>
+            <span class="font-bold text-sm block" x-text="testResult.status === 'success' ? t('test_success') : t('test_failed')"></span>
+            <span class="mt-1 block text-gray-400">
+              <span x-text="t('lbl_http_code')"></span>: <span class="font-bold text-white" x-text="testResult.code || '无'"></span> | <span x-text="lang === 'zh' ? '响应耗时' : 'Latency'"></span>: <span class="font-bold text-white" x-text="testResult.elapsed + ' ms'"></span>
+            </span>
+          </div>
+          <div class="text-2xl font-bold font-mono" x-text="testResult.code || 'ERROR'"></div>
+        </div>
+
+        <div x-show="testResult.status === 'success'" class="space-y-2">
+          <span class="text-gray-400 font-semibold block" x-text="t('lbl_response_body')"></span>
+          <pre class="w-full p-3 bg-brand-dark rounded-lg border border-brand-border text-gray-300 overflow-x-auto max-h-48 font-mono select-text" x-text="testResult.response || '[空响应体]'"></pre>
+        </div>
+
+        <div x-show="testResult.status === 'error'" class="space-y-2">
+          <span class="text-red-400 font-semibold block" x-text="t('lbl_error_stack')"></span>
+          <pre class="w-full p-3 bg-brand-dark rounded-lg border border-brand-border text-red-300 overflow-x-auto max-h-48 font-mono select-text" x-text="testResult.error"></pre>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <button @click="showTestResultModal = false" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭窗口' : 'Close'"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改管理员密码模态框 -->
+  <div x-show="showPwdModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showPwdModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
+      <button @click="showPwdModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
+        <i data-lucide="shield-check" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="t('modal_pwd_title')"></span>
+      </h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_old_pwd')"></label>
+          <input type="password" x-model="pwdForm.old_password" :placeholder="lang === 'zh' ? '请输入原密码...' : 'Enter old password...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_new_pwd')"></label>
+          <input type="password" x-model="pwdForm.new_password" :placeholder="lang === 'zh' ? '请输入新密码...' : 'Enter new password...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+        </div>
+        <button @click="changeAdminPassword()" :disabled="changingPwd" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+          <i data-lucide="check" class="w-4 h-4" x-show="!changingPwd"></i>
+          <span x-show="!changingPwd" x-text="t('btn_confirm_pwd')"></span>
+          <span x-show="changingPwd" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示弹出框 -->
+  <div class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div class="px-4 py-3 bg-brand-card border border-brand-border text-white rounded-xl shadow-xl flex items-center space-x-3 transform translate-y-0 transition duration-300 pointer-events-auto">
+        <span class="w-2 h-2 rounded-full" :class="toast.type === 'success' ? 'bg-emerald-400' : toast.type === 'error' ? 'bg-red-400' : 'bg-indigo-400'"></span>
+        <span class="text-xs font-medium" x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- JS 逻辑控制 -->
+  <script>
+    function appState() {
+      return {
+        lang: localStorage.getItem('lang') || (navigator.language.startsWith('en') ? 'en' : 'zh'),
+        i18n: {
+          zh: {
+            app_title: "TG 消息监控系统",
+            app_subtitle: "Telegram 消息监控控制台",
+            sys_online: "系统在线",
+            btn_pwd: "安全密码",
+            btn_refresh: "刷新数据",
+            auth_title: "后台安全管理验证",
+            auth_subtitle: "此系统已加固，请输入管理员密码访问后台。",
+            lbl_admin_pwd: "管理员密码",
+            ph_admin_pwd: "请输入访问密码...",
+            btn_login: "进入控制台",
+            login_hint: "默认密码为 admin，请进入后台后及时修改",
+            card_accounts: "Telegram 账号",
+            btn_add_account: "添加账号",
+            acc_status_online: "🟢 已在线",
+            acc_status_logging: "🟡 登录验证中",
+            acc_status_offline: "🔴 离线 / 需登录",
+            card_webhook: "全局 Webhook 配置",
+            lbl_webhook_url: "默认 Webhook URL",
+            webhook_hint: "匹配到规则的消息，默认会推送到该接口。",
+            lbl_webhook_method: "请求方法 (Method)",
+            lbl_custom_body: "自定义 POST Body (JSON 格式，可选)",
+            custom_body_hint: "若留空，默认发送包含消息、发送人、会话详情的完整数据包。",
+            lbl_timeout: "请求超时时间 (秒)",
+            btn_test_conn: "测试连接",
+            btn_save_config: "保存配置",
+            card_rules: "消息监控规则",
+            btn_new_rule: "新建监控规则",
+            lbl_rule_name: "规则名称",
+            lbl_bind_accounts: "绑定执行 Telegram 账号",
+            lbl_targets: "监听目标",
+            lbl_filters: "过滤匹配",
+            lbl_webhook: "Webhook 接收端",
+            lbl_status: "当前状态",
+            lbl_actions: "操作",
+            rule_enabled: "启用中",
+            rule_disabled: "已暂停",
+            btn_edit: "编辑",
+            btn_delete: "删除",
+            rule_filter_all: "📢 监听所有消息 (全量)",
+            rule_filter_kw: "🔍 按关键字过滤",
+            rule_regex_active: "正则模式",
+            rule_override_webhook: "覆盖全局 Webhook",
+            // 登录弹窗
+            modal_login_title: "添加 Telegram 账号",
+            lbl_phone: "手机号 (带区号，如 +8613800000000)",
+            btn_get_code: "获取验证码",
+            lbl_sms_code: "输入 Telegram 验证码",
+            btn_verify_code: "登录并启动监听",
+            lbl_2fa_pwd: "两步验证密码 (Two-Step Password)",
+            btn_verify_2fa: "验证并登录",
+            // 规则弹窗
+            lbl_bind_all: "所有已登录账号",
+            lbl_targets_field: "监听目标聊天 (按行分隔，支持 @username、Chat ID、群组名)",
+            targets_hint: "多账号模式下，绑定账号必须是这些监听目标群组或频道的成员才能收到消息。",
+            lbl_filter_mode: "过滤筛选模式",
+            lbl_kw_must: "必须包含以下关键字 (输入词后按回车添加)",
+            lbl_kw_exclude: "排除以下关键字 (包含这些词将被过滤掉，输入词后按回车添加)",
+            lbl_regex_enable: "启用正则表达式匹配",
+            regex_hint: "开启后，关键字将作为正则规则在后台匹配消息（支持忽略大小写）。",
+            lbl_override_webhook: "覆盖全局 Webhook",
+            override_hint: "如果需要将此监控推送至不同的独立 Webhook，请勾选此项。",
+            lbl_dedicated_url: "专属 Webhook URL",
+            lbl_dedicated_method: "专属请求方法 (Method)",
+            method_inherit: "继承全局",
+            lbl_dedicated_body: "专属自定义 POST Body (JSON 格式，可选)",
+            btn_test_dedicated: "测试专属 Webhook",
+            btn_cancel: "取消",
+            btn_save: "保存规则",
+            // 密码修改弹窗
+            modal_pwd_title: "修改管理员密码",
+            lbl_old_pwd: "原密码",
+            lbl_new_pwd: "新密码",
+            btn_confirm_pwd: "确认修改密码",
+            // Webhook 测试结果诊断弹窗
+            modal_test_title: "Webhook 连接测试诊断结果",
+            test_success: "🚀 测试发送完成",
+            test_failed: "❌ 发送失败",
+            lbl_http_code: "HTTP 状态码",
+            lbl_response_body: "下游 Webhook 响应数据 (前 1000 字符)：",
+            lbl_error_stack: "异常堆栈 / 错误原因：",
+            // 占位符说明弹窗
+            modal_help_title: "占位符帮助说明",
+            help_desc: "您可以在 Webhook URL 中填入占位符（如 {text}），触发时系统会自动进行值替换并完成安全 URL 编码。在 GET 模式下，如果未填写任何占位符，系统会自动将以下主要信息作为 QueryString 附加到 URL 后部。（点击气泡可直接复制占位符到剪贴板）",
+            lbl_placeholder_th: "占位符 (点击复制)",
+            lbl_meaning_th: "替换内容含义",
+            lbl_example_th: "示例替换值",
+            placeholder_text_desc: "消息文本内容",
+            placeholder_sender_name_desc: "发信人昵称 (优先 First+Last Name)",
+            placeholder_sender_username_desc: "发信人 Telegram Username (不含 @)",
+            placeholder_chat_title_desc: "消息会话名称（群组名/频道标题/私聊名）",
+            placeholder_receiver_account_desc: "接收该消息的当前监控账号 (手机号)",
+            placeholder_matched_keywords_desc: "命中的关键字 (多关键字以英文逗号分隔)",
+            placeholder_msg_id_desc: "消息在 Telegram 中分配的唯一 ID",
+            placeholder_chat_id_desc: "消息来源会话数字 ID",
+            placeholder_sender_id_desc: "发送人数字 ID",
+            placeholder_date_desc: "消息时间 (ISO 格式字符串)"
+          },
+          en: {
+            app_title: "TG Msg Monitor",
+            app_subtitle: "Telegram Message Monitor Console",
+            sys_online: "System Online",
+            btn_pwd: "Security",
+            btn_refresh: "Refresh",
+            auth_title: "Admin Console Authentication",
+            auth_subtitle: "This console is secured. Please enter the password to access.",
+            lbl_admin_pwd: "Admin Password",
+            ph_admin_pwd: "Enter password...",
+            btn_login: "Login",
+            login_hint: "Default password is admin. Change it after login.",
+            card_accounts: "Telegram Accounts",
+            btn_add_account: "Link Account",
+            acc_status_online: "🟢 Online",
+            acc_status_logging: "🟡 Logging in",
+            acc_status_offline: "🔴 Offline",
+            card_webhook: "Global Webhook Config",
+            lbl_webhook_url: "Default Webhook URL",
+            webhook_hint: "Messages matching active rules will be sent here.",
+            lbl_webhook_method: "Request Method",
+            lbl_custom_body: "Custom POST Body (JSON, Optional)",
+            custom_body_hint: "Leave empty to forward the default full payload JSON.",
+            lbl_timeout: "Request Timeout (Sec)",
+            btn_test_conn: "Test Link",
+            btn_save_config: "Save Config",
+            card_rules: "Monitoring Filter Rules",
+            btn_new_rule: "New Rule",
+            lbl_rule_name: "Rule Name",
+            lbl_bind_accounts: "Accounts",
+            lbl_targets: "Listen Targets",
+            lbl_filters: "Matching Filters",
+            lbl_webhook: "Webhook",
+            lbl_status: "Status",
+            lbl_actions: "Actions",
+            rule_enabled: "Active",
+            rule_disabled: "Paused",
+            btn_edit: "Edit",
+            btn_delete: "Delete",
+            rule_filter_all: "📢 Listen All",
+            rule_filter_kw: "🔍 Keywords",
+            rule_regex_active: "Regex Mode",
+            rule_override_webhook: "Dedicated Webhook",
+            // Login Modal
+            modal_login_title: "Link New Telegram Account",
+            lbl_phone: "Phone (with country code, e.g., +18255729287)",
+            btn_get_code: "Get Code",
+            lbl_sms_code: "Enter SMS Code",
+            btn_verify_code: "Verify & Link",
+            lbl_2fa_pwd: "2FA Password (Two-Step Verification)",
+            btn_verify_2fa: "Complete 2FA Verification",
+            // Rule Modal
+            lbl_bind_all: "Bind all active accounts",
+            lbl_targets_field: "Listen Target Chats (one per line, @username, Chat ID, Group name)",
+            targets_hint: "Linked accounts must be members of these groups/channels to receive messages.",
+            lbl_filter_mode: "Filter Mode",
+            lbl_kw_must: "Must contain keywords (Press Enter to add tag)",
+            lbl_kw_exclude: "Exclude keywords (Press Enter to add tag)",
+            lbl_regex_enable: "Enable Regular Expression (Regex)",
+            regex_hint: "Keywords will be parsed as case-insensitive regex patterns.",
+            lbl_override_webhook: "Override Global Webhook",
+            override_hint: "Check this to forward matched messages to a dedicated endpoint.",
+            lbl_dedicated_url: "Dedicated Webhook URL",
+            lbl_dedicated_method: "Dedicated Method",
+            method_inherit: "Inherit Global",
+            lbl_dedicated_body: "Dedicated POST Body (JSON, Optional)",
+            btn_test_dedicated: "Test Dedicated Webhook",
+            btn_cancel: "Cancel",
+            btn_save: "Save Rule",
+            // Password Edit Modal
+            modal_pwd_title: "Modify Admin Password",
+            lbl_old_pwd: "Old Password",
+            lbl_new_pwd: "New Password",
+            btn_confirm_pwd: "Change Password",
+            // Diagnostic Modal
+            modal_test_title: "Webhook Connection Diagnostics",
+            test_success: "🚀 Test Request Completed",
+            test_failed: "❌ Request Failed",
+            lbl_http_code: "HTTP Status Code",
+            lbl_response_body: "Downstream Response Payload (First 1000 chars):",
+            lbl_error_stack: "Error Exception Stack / Reasons:",
+            // Placeholder Help Modal
+            modal_help_title: "Webhook URL Placeholder Reference Guide",
+            help_desc: "You can write placeholders (e.g. {text}) in the Webhook URL. They are safely URL-encoded during trigger dispatch. Under GET method with no placeholders, variables append as query strings automatically. (Click variable bubbles to copy to clipboard)",
+            lbl_placeholder_th: "Placeholder (Click to Copy)",
+            lbl_meaning_th: "Description",
+            lbl_example_th: "Example Value",
+            placeholder_text_desc: "Message text body",
+            placeholder_sender_name_desc: "Sender's name (First + Last Name)",
+            placeholder_sender_username_desc: "Sender's username (without @)",
+            placeholder_chat_title_desc: "Group, channel or chat title",
+            placeholder_receiver_account_desc: "Phone number of receiving client",
+            placeholder_matched_keywords_desc: "Matched filtering tags (comma-separated)",
+            placeholder_msg_id_desc: "Unique message ID under TG",
+            placeholder_chat_id_desc: "Target chat integer ID",
+            placeholder_sender_id_desc: "Sender user integer ID",
+            placeholder_date_desc: "Message ISO datetime string"
+          }
+        },
+        t(key) {
+          return this.i18n[this.lang][key] || key;
+        },
+        toggleLanguage() {
+          this.lang = this.lang === 'zh' ? 'en' : 'zh';
+          localStorage.setItem('lang', this.lang);
+          this.$nextTick(() => lucide.createIcons());
+        },
+        accounts: [],
+        rules: [],
+        globalWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
+        refreshing: false,
+        
+        // 帮助与诊断弹窗
+        showHelpModal: false,
+        showTestResultModal: false,
+        testingWebhook: false,
+        testResult: { status: "", code: null, elapsed: 0, response: "", error: "" },
+        
+        // 模态框开关
+        showLoginModal: false,
+        showRuleModal: false,
+        
+        // 临时 Tag 输入暂存变量
+        tempKeyword: "",
+        tempExcludeKeyword: "",
+        
+        // 管理员登录与鉴权变量
+        isLoggedIn: !!localStorage.getItem('admin_token'),
+        adminPasswordInput: "",
+        loggingIn: false,
+        showPwdModal: false,
+        changingPwd: false,
+        pwdForm: { old_password: "", new_password: "" },
+
+        // 登录参数
+        loginStep: 1, // 1: API信息及手机号, 2: 验证码, 3: 两步验证密码
+        submittingLogin: false,
+        loginError: "",
+        loginForm: {
+          phone: "",
+          api_id: "",
+          api_hash: "",
+          code: "",
+          password: ""
+        },
+
+        // 规则参数
+        ruleForm: {
+          isEdit: false,
+          id: "",
+          name: "",
+          bindAll: true,
+          accounts: [],
+          targetsText: "",
+          filterMode: "all", // all / keywords
+          keywords: [],
+          exclude_keywords: [],
+          use_regex: false,
+          overrideWebhook: false,
+          webhookUrl: "",
+          webhookMethod: "",
+          webhookCustomBody: ""
+        },
+
+        // Toast 消息
+        toasts: [],
+
+        init() {
+          if (this.isLoggedIn) {
+            this.refreshData();
+          } else {
+            this.$nextTick(() => lucide.createIcons());
+          }
+          // 每 5 秒轮询一次账号状态，保持同步
+          setInterval(() => {
+            if (this.isLoggedIn) {
+              this.fetchAccountsSilently();
+            }
+          }, 5000);
+        },
+
+        // --- 统一 API 请求代理 ---
+        async apiFetch(url, options = {}) {
+          options.headers = options.headers || {};
+          const token = localStorage.getItem('admin_token');
+          if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+          }
+          
+          if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(options.body);
+          }
+          
+          const res = await fetch(url, options);
+          if (res.status === 401) {
+            localStorage.removeItem('admin_token');
+            this.isLoggedIn = false;
+            this.showToast("登录已过期或未授权，请重新登录", "error");
+            throw new Error("Unauthorized");
+          }
+          return res;
+        },
+
+        // --- 管理员登录与修改密码 ---
+        async loginAdmin() {
+          if (!this.adminPasswordInput.trim()) {
+            this.showToast("请输入密码", "error");
+            return;
+          }
+          this.loggingIn = true;
+          try {
+            const res = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password: this.adminPasswordInput })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              localStorage.setItem('admin_token', data.token);
+              this.isLoggedIn = true;
+              this.adminPasswordInput = "";
+              this.showToast("身份验证成功！");
+              this.refreshData();
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "密码验证失败", "error");
+            }
+          } catch (e) {
+            this.showToast("验证请求异常: " + e, "error");
+          } finally {
+            this.loggingIn = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        async changeAdminPassword() {
+          if (!this.pwdForm.old_password || !this.pwdForm.new_password) {
+            this.showToast("请填写完整密码项", "error");
+            return;
+          }
+          this.changingPwd = true;
+          try {
+            const res = await this.apiFetch("/api/auth/change-password", {
+              method: "POST",
+              body: {
+                old_password: this.pwdForm.old_password,
+                new_password: this.pwdForm.new_password
+              }
+            });
+            if (res.ok) {
+              this.showToast("密码修改成功，请重新登录！");
+              localStorage.removeItem('admin_token');
+              this.isLoggedIn = false;
+              this.showPwdModal = false;
+              this.pwdForm = { old_password: "", new_password: "" };
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "旧密码不正确", "error");
+            }
+          } catch (e) {
+            this.showToast("操作请求异常: " + e, "error");
+          } finally {
+            this.changingPwd = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        showToast(message, type = "success") {
+          const id = Date.now();
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3000);
+        },
+
+        async refreshData() {
+          this.refreshing = true;
+          try {
+            await Promise.all([
+              this.fetchAccounts(),
+              this.fetchRules(),
+              this.fetchWebhookConfig()
+            ]);
+            this.showToast("数据加载成功");
+          } catch (e) {
+            this.showToast("加载数据失败", "error");
+          } finally {
+            this.refreshing = false;
+          }
+        },
+
+        async fetchAccounts() {
+          const res = await this.apiFetch("/api/accounts");
+          this.accounts = await res.json();
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        async fetchAccountsSilently() {
+          try {
+            const res = await this.apiFetch("/api/accounts");
+            this.accounts = await res.json();
+            this.$nextTick(() => lucide.createIcons());
+          } catch(e) {}
+        },
+
+        async fetchRules() {
+          const res = await this.apiFetch("/api/rules");
+          this.rules = await res.json();
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        async fetchWebhookConfig() {
+          const res = await this.apiFetch("/api/config/webhook");
+          this.globalWebhook = await res.json();
+        },
+
+        async saveGlobalWebhook() {
+          try {
+            const res = await this.apiFetch("/api/config/webhook", {
+              method: "POST",
+              body: this.globalWebhook
+            });
+            if (res.ok) {
+              this.showToast("全局 Webhook 保存成功");
+            } else {
+              this.showToast("保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败", "error");
+          }
+        },
+
+        // --- 账号授权流程 ---
+        openLoginModal() {
+          this.loginStep = 1;
+          this.loginError = "";
+          this.submittingLogin = false;
+          this.loginForm = { phone: "", api_id: "", api_hash: "", code: "", password: "" };
+          this.showLoginModal = true;
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        closeLoginModal() {
+          this.showLoginModal = false;
+        },
+
+        async sendCode() {
+          if (!this.loginForm.phone || !this.loginForm.api_id || !this.loginForm.api_hash) {
+            this.loginError = "请填满所有字段。";
+            return;
+          }
+          this.submittingLogin = true;
+          this.loginError = "";
+          try {
+            const res = await this.apiFetch("/api/auth/send-code", {
+              method: "POST",
+              body: {
+                phone: this.loginForm.phone,
+                api_id: parseInt(this.loginForm.api_id),
+                api_hash: this.loginForm.api_hash
+              }
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "need_code") {
+              this.loginStep = 2;
+              this.showToast("验证码已发往客户端");
+            } else {
+              this.loginError = data.detail || "连接 Telegram 失败，请检查配置与网络环境。";
+            }
+          } catch (e) {
+            this.loginError = "请求异常: " + e;
+          } finally {
+            this.submittingLogin = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        async verifyCode() {
+          if (!this.loginForm.code) {
+            this.loginError = "请输入验证码。";
+            return;
+          }
+          this.submittingLogin = true;
+          this.loginError = "";
+          try {
+            const res = await this.apiFetch("/api/auth/verify-code", {
+              method: "POST",
+              body: {
+                phone: this.loginForm.phone,
+                code: this.loginForm.code
+              }
+            });
+            const data = await res.json();
+            if (res.ok) {
+              if (data.status === "success") {
+                this.showToast("登录绑定成功");
+                this.closeLoginModal();
+                this.fetchAccounts();
+              } else if (data.status === "need_password") {
+                this.loginStep = 3;
+              }
+            } else {
+              this.loginError = data.detail || "验证码验证失败，请重新确认。";
+            }
+          } catch (e) {
+            this.loginError = "请求异常: " + e;
+          } finally {
+            this.submittingLogin = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        async verify2FA() {
+          if (!this.loginForm.password) {
+            this.loginError = "请输入两步验证密码。";
+            return;
+          }
+          this.submittingLogin = true;
+          this.loginError = "";
+          try {
+            const res = await this.apiFetch("/api/auth/verify-2fa", {
+              method: "POST",
+              body: {
+                phone: this.loginForm.phone,
+                password: this.loginForm.password
+              }
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "success") {
+              this.showToast("两步验证成功，登录成功");
+              this.closeLoginModal();
+              this.fetchAccounts();
+            } else {
+              this.loginError = data.detail || "密码错误。";
+            }
+          } catch (e) {
+            this.loginError = "请求异常: " + e;
+          } finally {
+            this.submittingLogin = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        async deleteAccount(phone) {
+          try {
+            const res = await this.apiFetch(`/api/accounts/${encodeURIComponent(phone)}`, {
+              method: "DELETE"
+            });
+            if (res.ok) {
+              this.showToast("账号已安全移除");
+              this.fetchAccounts();
+            } else {
+              this.showToast("删除失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败", "error");
+          }
+        },
+
+        // --- 规则管理 ---
+        openRuleModal(rule = null) {
+          if (rule) {
+            // 编辑
+            const bindAll = rule.accounts.includes("all");
+            this.ruleForm = {
+              isEdit: true,
+              id: rule.id,
+              name: rule.name,
+              bindAll: bindAll,
+              accounts: bindAll ? [] : [...rule.accounts],
+              targetsText: rule.targets.join("\n"),
+              filterMode: rule.filters.keywords.length === 0 ? "all" : "keywords",
+              keywords: [...rule.filters.keywords],
+              exclude_keywords: [...(rule.filters.exclude_keywords || [])],
+              use_regex: rule.filters.use_regex || false,
+              overrideWebhook: !!rule.webhook.url,
+              webhookUrl: rule.webhook.url || "",
+              webhookMethod: rule.webhook.method || "",
+              webhookCustomBody: rule.webhook.custom_body || ""
+            };
+          } else {
+            // 新建
+            this.ruleForm = {
+              isEdit: false,
+              id: "rule_" + Math.random().toString(36).substr(2, 9),
+              name: "",
+              bindAll: true,
+              accounts: [],
+              targetsText: "",
+              filterMode: "all",
+              keywords: [],
+              exclude_keywords: [],
+              use_regex: false,
+              overrideWebhook: false,
+              webhookUrl: "",
+              webhookMethod: "",
+              webhookCustomBody: ""
+            };
+          }
+          this.tempKeyword = "";
+          this.tempExcludeKeyword = "";
+          this.showRuleModal = true;
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        closeRuleModal() {
+          this.showRuleModal = false;
+        },
+
+        handleBindAllChange() {
+          if (this.ruleForm.bindAll) {
+            this.ruleForm.accounts = [];
+          }
+        },
+
+        async saveRule() {
+          // 自动抓取未按回车就点击保存的临时输入
+          if (this.tempKeyword && this.tempKeyword.trim()) {
+            this.ruleForm.keywords.push(this.tempKeyword.trim());
+            this.tempKeyword = "";
+          }
+          if (this.tempExcludeKeyword && this.tempExcludeKeyword.trim()) {
+            this.ruleForm.exclude_keywords.push(this.tempExcludeKeyword.trim());
+            this.tempExcludeKeyword = "";
+          }
+
+          if (!this.ruleForm.name.trim()) {
+            this.showToast("请填写规则名称", "error");
+            return;
+          }
+
+          if (this.ruleForm.filterMode === 'keywords' && this.ruleForm.keywords.length === 0) {
+            this.showToast("在关键字过滤模式下，请至少添加一个必须包含的关键字", "error");
+            return;
+          }
+
+          // 提取 Targets
+          const targets = this.ruleForm.targetsText
+            .split("\n")
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+
+          if (targets.length === 0) {
+            this.showToast("至少输入一个监听目标", "error");
+            return;
+          }
+
+          // 整理 Accounts 列表
+          let ruleAccounts = ["all"];
+          if (!this.ruleForm.bindAll) {
+            if (this.ruleForm.accounts.length === 0) {
+              this.showToast("至少勾选一个绑定的账号", "error");
+              return;
+            }
+            ruleAccounts = [...this.ruleForm.accounts];
+          }
+
+          const payload = {
+            id: this.ruleForm.id,
+            name: this.ruleForm.name,
+            accounts: ruleAccounts,
+            targets: targets,
+            filters: {
+              keywords: this.ruleForm.filterMode === "all" ? [] : [...this.ruleForm.keywords],
+              exclude_keywords: this.ruleForm.filterMode === "all" ? [] : [...this.ruleForm.exclude_keywords],
+              use_regex: this.ruleForm.use_regex
+            },
+            webhook: {
+              url: this.ruleForm.overrideWebhook ? this.ruleForm.webhookUrl.trim() : "",
+              method: this.ruleForm.overrideWebhook ? this.ruleForm.webhookMethod : "",
+              custom_body: this.ruleForm.overrideWebhook ? this.ruleForm.webhookCustomBody : ""
+            },
+            is_enabled: true
+          };
+
+          try {
+            const url = this.ruleForm.isEdit ? `/api/rules/${this.ruleForm.id}` : "/api/rules";
+            const method = this.ruleForm.isEdit ? "PUT" : "POST";
+            
+            const res = await this.apiFetch(url, {
+              method: method,
+              body: payload
+            });
+
+            if (res.ok) {
+              this.showToast(this.ruleForm.isEdit ? "规则已成功修改并重载" : "监控规则创建成功，已重载配置");
+              this.closeRuleModal();
+              this.fetchRules();
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        async deleteRule(id) {
+          try {
+            const res = await this.apiFetch(`/api/rules/${id}`, {
+              method: "DELETE"
+            });
+            if (res.ok) {
+              this.showToast("规则已删除");
+              this.fetchRules();
+            } else {
+              this.showToast("删除失败", "error");
+            }
+          } catch (e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        async toggleRule(id) {
+          try {
+            const res = await this.apiFetch(`/api/rules/${id}/toggle`, {
+              method: "POST"
+            });
+            if (res.ok) {
+              const data = await res.json();
+              this.showToast(data.message);
+              this.fetchRules();
+            } else {
+              this.showToast("更新规则状态失败", "error");
+            }
+          } catch (e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        // --- 测试 Webhook 发送 ---
+        async testWebhook(type) {
+          let url = "";
+          let method = "POST";
+          let custom_body = "";
+          if (type === 'global') {
+            url = this.globalWebhook.url;
+            method = this.globalWebhook.method;
+            custom_body = this.globalWebhook.custom_body;
+          } else {
+            url = this.ruleForm.webhookUrl;
+            method = this.ruleForm.webhookMethod || this.globalWebhook.method;
+            custom_body = this.ruleForm.webhookCustomBody;
+          }
+
+          if (!url) {
+            this.showToast("请输入 Webhook URL 之后再进行测试", "error");
+            return;
+          }
+
+          this.testingWebhook = true;
+          try {
+            const res = await this.apiFetch("/api/webhook/test", {
+              method: "POST",
+              body: { url, method, custom_body }
+            });
+            const data = await res.json();
+            this.testResult = {
+              status: data.status,
+              code: data.status_code,
+              elapsed: data.elapsed_ms,
+              response: data.response || "",
+              error: data.error || ""
+            };
+            this.showTestResultModal = true;
+          } catch (e) {
+            this.showToast("请求测试 API 失败: " + e, "error");
+          } finally {
+            this.testingWebhook = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  tg-monitor:
+    image: ghcr.io/${GITHUB_REPOSITORY:-tomato/tgmsgmonitor}:latest
+    build: .
+    container_name: tg_msg_monitor
+    ports:
+      - "8010:8010"
+    volumes:
+      # 持久化已登录的 Telegram session 文件，防止容器重启后掉线
+      - ./sessions:/app/sessions
+      # 持久化后台配置参数（包含管理员密码、Webhook 及规则等）
+      - ./config.json:/app/config.json
+    restart: always

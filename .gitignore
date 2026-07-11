@@ -1,0 +1,18 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# 系统敏感数据与授权 session (绝对不能提交至公开仓库)
+config.json
+sessions/
+*.session
+*.session-journal
+
+# 操作系统临时文件
+.DS_Store
+Thumbs.db
