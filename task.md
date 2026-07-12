@@ -23,8 +23,10 @@
 - `[x]` 步骤 9: Bug 修复、自定义 POST Body 与 Webhook 测试及帮助弹窗升级
 - `[x]` 步骤 10: 管理员口令鉴权系统与 Host 自定义配置升级
   - `[x]` 在 `backend.py` 中增加 `admin_password` 与 `server` 字段，并在 ConfigManager 中支持默认写入
-  - `[x]` 在 `backend.py` 中编写 `verify_token` 拦截器依赖，并挂载至所有核心 API
-  - `[x]` 在 `backend.py` 中编写 `POST /api/auth/login` 与 `POST /api/auth/change-password` 接口
+  - `[x]` 1. 修改 `app/backend.py` 引入防爆破机制与 Request 导入
+  - `[x]` 2. 编写独立测试脚本 `scratch/test_brute_force_protection.py`
+  - `[x]` 3. 运行测试验证防爆破机制是否按预期工作
+  - `[x]` 4. 编写并提交 `walkthrough.md` 验证说明中编写 `POST /api/auth/login` 与 `POST /api/auth/change-password` 接口
   - `[x]` 在 `index.html` 中编写全屏登录遮罩，未登录状态锁定页面
   - `[x]` 在 `index.html` 中编写 `apiFetch` 拦截器，自动携带 Token 并处理 `401` 自动退登，提供密码修改选项
   - `[x]` 在 `main.py` 中支持从配置或参数读取 host/port，默认绑定为 `0.0.0.0:8010` (因 8000 端口冲突，调整为 8010)

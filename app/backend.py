@@ -3,7 +3,7 @@ import json
 import asyncio
 import re
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Depends, Header
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Depends, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -12,6 +12,7 @@ from telethon.errors import SessionPasswordNeededError
 from loguru import logger
 import httpx
 import secrets
+import time
 
 # 基础目录配置
 CONFIG_PATH = "config.json"
@@ -481,6 +482,11 @@ tg_manager = TelegramManager(config_manager)
 # 内存令牌缓存
 current_token: Optional[str] = None
 
+# 防爆破登录限制配置与内存记录
+login_attempts: Dict[str, Dict[str, Any]] = {}
+MAX_ATTEMPTS = 5
+LOCKOUT_DURATION = 1800  # 30分钟
+
 async def verify_token(authorization: Optional[str] = Header(None)):
     global current_token
     if not authorization or not authorization.startswith("Bearer "):
@@ -492,16 +498,52 @@ async def verify_token(authorization: Optional[str] = Header(None)):
 # --- 鉴权管理 API ---
 
 @app.post("/api/auth/login")
-async def admin_login(req: LoginReq):
+async def admin_login(req: LoginReq, request: Request):
     global current_token
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # 检查是否被锁定
+    now = time.time()
+    attempt = login_attempts.get(client_ip)
+    if attempt and attempt.get("lock_until", 0) > now:
+        remaining = int(attempt["lock_until"] - now)
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试次数过多。该IP已被临时锁定，请在 {remaining} 秒后再试。"
+        )
+        
     config = await config_manager.get_config()
     saved_password = config.get("admin_password", "admin")
     
     if req.password == saved_password:
+        # 验证成功，清除失败记录
+        if client_ip in login_attempts:
+            login_attempts.pop(client_ip, None)
         current_token = secrets.token_hex(24)
         return {"status": "success", "token": current_token}
     else:
-        raise HTTPException(status_code=400, detail="管理员密码错误。")
+        # 密码错误，更新记录
+        if not attempt:
+            attempt = {"count": 0, "lock_until": 0}
+            login_attempts[client_ip] = attempt
+            
+        attempt["count"] += 1
+        remaining_attempts = MAX_ATTEMPTS - attempt["count"]
+        
+        if attempt["count"] >= MAX_ATTEMPTS:
+            attempt["lock_until"] = now + LOCKOUT_DURATION
+            attempt["count"] = 0  # 锁定后重置计数
+            raise HTTPException(
+                status_code=429,
+                detail="管理员密码错误。尝试次数过多，该IP已被临时锁定 30 分钟。"
+            )
+        else:
+            # 引入 1 秒延迟惩罚，防止快速爆破
+            await asyncio.sleep(1)
+            raise HTTPException(
+                status_code=400,
+                detail=f"管理员密码错误。您还剩 {remaining_attempts} 次尝试机会。"
+            )
 
 @app.post("/api/auth/change-password", dependencies=[Depends(verify_token)])
 async def change_password(req: ChangePasswordReq):
