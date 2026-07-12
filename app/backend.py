@@ -237,9 +237,9 @@ class TelegramManager:
             if "all" not in rule_accounts and phone not in rule_accounts:
                 continue
 
-            # 2. 目标聊天匹配
+            # 2. 目标聊天与发送人匹配
             targets = rule.get("targets", [])
-            if not await self.is_target_match(event, chat, targets):
+            if not await self.is_target_match(event, chat, sender, targets):
                 continue
 
             # 3. 关键字过滤
@@ -353,8 +353,8 @@ class TelegramManager:
                     custom_body=webhook_custom_body
                 ))
 
-    async def is_target_match(self, event, chat, targets: List[str]) -> bool:
-        """检查消息来源会话是否与规则中的目标之一匹配"""
+    async def is_target_match(self, event, chat, sender, targets: List[str]) -> bool:
+        """检查消息来源会话或发送人是否与规则中的目标之一匹配"""
         if not targets:
             return False
 
@@ -365,10 +365,11 @@ class TelegramManager:
             if not target_str:
                 continue
 
-            # A. 数字 ID 匹配 (兼容 -100 开头的超级群/频道 ID)
+            # A. 数字 ID 匹配 (兼容 -100 开头的超级群/频道 ID 以及发送者 ID)
             clean_target = target_str[1:] if target_str.startswith('-') else target_str
             if clean_target.isdigit():
                 target_int = int(target_str)
+                # 匹配群组/频道/私聊 ID
                 if target_int == chat_id:
                     return True
                 # 兼容未包含 -100 前缀的情况
@@ -376,14 +377,22 @@ class TelegramManager:
                     return True
                 if not target_str.startswith('-100') and f"-100{target_str}" == str(chat_id):
                     return True
+                # 匹配发送人用户 ID
+                if sender and hasattr(sender, 'id') and sender.id == target_int:
+                    return True
 
-            # B. Username 匹配 (带或不带 @)
+            # B. Username 匹配 (带或不带 @) - 会话匹配
             username_to_check = target_str[1:] if target_str.startswith('@') else target_str
             if chat and hasattr(chat, 'username') and chat.username:
                 if chat.username.lower() == username_to_check.lower():
                     return True
 
-            # C. 聊天 Title 标题匹配 (模糊匹配或全匹配，这里做全匹配)
+            # C. 发送人 (Sender) Username 匹配 (带或不带 @) - 允许直接按人/机器人监控
+            if sender and hasattr(sender, 'username') and sender.username:
+                if sender.username.lower() == username_to_check.lower():
+                    return True
+
+            # D. 聊天 Title 标题匹配 (模糊匹配或全匹配，这里做全匹配)
             if chat and hasattr(chat, 'title') and chat.title:
                 if chat.title.lower() == target_str.lower():
                     return True
