@@ -19,6 +19,9 @@ CONFIG_PATH = "config.json"
 SESSIONS_DIR = "sessions"
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
+# 内存缓存，保存 username 到 Telegram 数字 ID 的映射
+username_to_id_cache: Dict[str, int] = {}
+
 import urllib.parse
 
 # ----------------- 占位符解析工具函数 -----------------
@@ -382,18 +385,39 @@ class TelegramManager:
                 if sender and hasattr(sender, 'id') and sender.id == target_int:
                     return True
 
-            # B. Username 匹配 (带或不带 @) - 会话匹配
+            # B. 动态解析并缓存 Username 翻译为数字 ID 进行绝对匹配 (防范 Telethon 属性缓存缺失)
             username_to_check = target_str[1:] if target_str.startswith('@') else target_str
+            if not username_to_check.isdigit():
+                cached_id = username_to_id_cache.get(username_to_check.lower())
+                if not cached_id and hasattr(event, 'client') and event.client:
+                    try:
+                        # 尝试异步通过 Telethon 将 username 翻译成实体并提取其唯一数字 ID
+                        entity = await event.client.get_entity(username_to_check)
+                        if entity:
+                            cached_id = entity.id
+                            username_to_id_cache[username_to_check.lower()] = cached_id
+                            logger.info(f"成功将目标 username @{username_to_check} 翻译并缓存为 ID: {cached_id}")
+                    except Exception as e:
+                        logger.debug(f"无法为目标 @{username_to_check} 自动解析 ID: {e}")
+                
+                # 如果我们成功翻译了 ID，直接进行高可信度的 ID 比对
+                if cached_id:
+                    if chat_id == cached_id:
+                        return True
+                    if sender and hasattr(sender, 'id') and sender.id == cached_id:
+                        return True
+
+            # C. Username 匹配 (带或不带 @) - 会话匹配 (后备方案)
             if chat and hasattr(chat, 'username') and chat.username:
                 if chat.username.lower() == username_to_check.lower():
                     return True
 
-            # C. 发送人 (Sender) Username 匹配 (带或不带 @) - 允许直接按人/机器人监控
+            # D. 发送人 (Sender) Username 匹配 (带或不带 @) - 会话匹配 (后备方案)
             if sender and hasattr(sender, 'username') and sender.username:
                 if sender.username.lower() == username_to_check.lower():
                     return True
 
-            # D. 聊天 Title 标题匹配 (模糊匹配或全匹配，这里做全匹配)
+            # E. 聊天 Title 标题匹配 (模糊匹配或全匹配，这里做全匹配)
             if chat and hasattr(chat, 'title') and chat.title:
                 if chat.title.lower() == target_str.lower():
                     return True
