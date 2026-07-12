@@ -208,12 +208,13 @@ class TelegramManager:
 
     async def handle_new_message(self, phone: str, event):
         """处理监听到的新消息，执行过滤并分发 Webhook"""
+        message_text = event.message.message or ""
+        chat_id = event.chat_id
+        logger.info(f"【监听捕获】账号 {phone} 收到事件 -> 会话ID: {chat_id} | 消息内容: {message_text[:100]}")
+
         config = await self.config_manager.get_config()
         rules = config.get("rules", [])
         global_webhook = config.get("global_webhook", {})
-
-        message_text = event.message.message or ""
-        chat_id = event.chat_id
 
         # 异步拉取 sender 和 chat 详情，避免阻塞
         sender = None
