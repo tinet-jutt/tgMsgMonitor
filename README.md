@@ -128,6 +128,8 @@ If a custom POST body is not provided, the default payload sent to your Webhook 
 
 ## 简体中文
 
+一个健壮、自托管的多账号 Telegram 消息监控与转发系统。基于 **FastAPI** 与 **Telethon (MTProto API)** 构建，并配备了精美、响应迅速的磨砂玻璃科技风 Web 管理后台。系统能够自动过滤接收到的消息并触发自定义的 Webhook 推送。
+
 ### ⚡ 核心功能
 
 * **多账号并发监听**：基于 MTProto 协议支持同时运行多个 Telegram 账号客户端，并在同一个异步事件循环中高效分发。登录状态（Session）安全保存在本地，后续启动系统将自动免密重连。
