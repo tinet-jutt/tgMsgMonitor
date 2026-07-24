@@ -56,6 +56,7 @@ class GlobalWebhookConfig(BaseModel):
 class RuleFilter(BaseModel):
     keywords: List[str] = []
     exclude_keywords: List[str] = []
+    exclude_senders: List[str] = []
     use_regex: bool = False
 
 class RuleWebhook(BaseModel):
@@ -291,6 +292,33 @@ class TelegramManager:
                             break
                 if is_excluded:
                     logger.info(f"消息匹配到排除关键字，已拦截。内容: {message_text[:100]}...")
+                    continue
+
+            # 4.5 排除发送者过滤
+            exclude_senders = filters.get("exclude_senders", [])
+            if exclude_senders and sender:
+                sender_username = (getattr(sender, 'username', '') or '').lower()
+                sender_id = str(getattr(sender, 'id', ''))
+                
+                is_sender_excluded = False
+                for ex_sender in exclude_senders:
+                    if not ex_sender:
+                        continue
+                    ex_clean = str(ex_sender).strip().lstrip('@').lower()
+                    if not ex_clean:
+                        continue
+                    
+                    # 匹配 username (如 baduser 或 @baduser)
+                    if sender_username and ex_clean == sender_username:
+                        is_sender_excluded = True
+                        break
+                    # 匹配 发送者数字 ID (如 12345678)
+                    if sender_id and ex_clean == sender_id:
+                        is_sender_excluded = True
+                        break
+
+                if is_sender_excluded:
+                    logger.info(f"消息发信人 [@{sender_username} | ID: {sender_id}] 匹配到排除发送者，已拦截。")
                     continue
 
             # 5. 触发 Webhook
