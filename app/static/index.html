@@ -317,8 +317,11 @@
                     <div>
                       <span class="text-gray-500 font-medium block mb-1">🔍 <span x-text="lang === 'zh' ? '匹配关键字 (Keywords)' : 'Matching Filters'"></span></span>
                       <div class="flex flex-wrap gap-1.5">
-                        <template x-if="rule.filters.keywords.length === 0">
+                        <template x-if="rule.filters.keywords.length === 0 && (!rule.filters.exclude_keywords || rule.filters.exclude_keywords.length === 0)">
                           <span class="text-emerald-400 font-medium" x-text="lang === 'zh' ? '📢 监听全部消息 (全量)' : '📢 Forwarding All Messages'"></span>
+                        </template>
+                        <template x-if="rule.filters.keywords.length === 0 && rule.filters.exclude_keywords && rule.filters.exclude_keywords.length > 0">
+                          <span class="text-gray-400 font-medium" x-text="lang === 'zh' ? '未限制包含词 (仅排除词过滤)' : 'Any message (exclude list only)'"></span>
                         </template>
                         <template x-for="kw in rule.filters.keywords" :key="kw">
                           <span class="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded font-semibold" x-text="kw"></span>
@@ -1348,7 +1351,7 @@
               bindAll: bindAll,
               accounts: bindAll ? [] : [...rule.accounts],
               targetsText: rule.targets.join("\n"),
-              filterMode: rule.filters.keywords.length === 0 ? "all" : "keywords",
+              filterMode: (rule.filters.keywords.length === 0 && (!rule.filters.exclude_keywords || rule.filters.exclude_keywords.length === 0)) ? "all" : "keywords",
               keywords: [...rule.filters.keywords],
               exclude_keywords: [...(rule.filters.exclude_keywords || [])],
               use_regex: rule.filters.use_regex || false,
@@ -1408,8 +1411,8 @@
             return;
           }
 
-          if (this.ruleForm.filterMode === 'keywords' && this.ruleForm.keywords.length === 0) {
-            this.showToast("在关键字过滤模式下，请至少添加一个必须包含的关键字", "error");
+          if (this.ruleForm.filterMode === 'keywords' && this.ruleForm.keywords.length === 0 && this.ruleForm.exclude_keywords.length === 0) {
+            this.showToast(this.lang === 'zh' ? "在关键字过滤模式下，请至少添加一个包含或排除关键字" : "In keyword filter mode, please add at least one include or exclude keyword", "error");
             return;
           }
 
