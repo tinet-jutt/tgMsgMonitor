@@ -71,6 +71,7 @@ class RuleModel(BaseModel):
     targets: List[str] = []         # 监听的目标，例如 ["@group", "-1001234567"]
     filters: RuleFilter
     webhook: RuleWebhook
+    debounce_seconds: int = 0      # 防抖冷却时间（秒），0 表示禁用
     is_enabled: bool = True
 
 class AccountModel(BaseModel):
@@ -172,6 +173,8 @@ class TelegramManager:
         self.login_clients: Dict[str, TelegramClient] = {}
         # 登录流程中的 hash 缓存 {phone: phone_code_hash}
         self.phone_code_hashes: Dict[str, str] = {}
+        # 规则防抖截止时间缓存 {rule_id: debounce_until_timestamp}
+        self.rule_debounce_until: Dict[str, float] = {}
 
     async def init_and_start_active_accounts(self):
         """服务启动时，自动启动所有已激活的 Telegram 客户端"""
@@ -319,6 +322,21 @@ class TelegramManager:
 
                 if is_sender_excluded:
                     logger.info(f"消息发信人 [@{sender_username} | ID: {sender_id}] 匹配到排除发送者，已拦截。")
+                    continue
+
+            # 4.8 防抖冷却过滤 (Debounce Filter)
+            rule_id = rule.get("id")
+            debounce_seconds = rule.get("debounce_seconds", 0) or filters.get("debounce_seconds", 0) or 0
+            if debounce_seconds > 0 and rule_id:
+                now = time.time()
+                debounce_until = self.rule_debounce_until.get(rule_id, 0)
+                
+                # 无论是否处于冷却期，符合条件的要发送消息均刷新重置该防抖时间
+                self.rule_debounce_until[rule_id] = now + debounce_seconds
+                
+                if now < debounce_until:
+                    remaining = int(debounce_until - now)
+                    logger.info(f"规则 [{rule.get('name')}] 正在防抖冷却中 (剩余 {remaining} 秒)，防抖时间已重置为 {debounce_seconds} 秒，已拦截本次消息推送。")
                     continue
 
             # 5. 触发 Webhook
