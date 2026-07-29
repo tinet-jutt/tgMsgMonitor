@@ -11,7 +11,8 @@ A robust, self-hosted, multi-account Telegram message monitoring and forwarding 
 ### ⚡ Key Features
 
 * **Multi-Account Concurrent Listening**: Runs multiple Telegram accounts simultaneously under a shared asynchronous event loop. Persistent sessions are kept in a local folder for passwordless auto-reconnections.
-* **Granular Filter Rules**: Listen to specific targets (chats, groups, channels, bots, or direct messages). Supports inclusive/exclusive keywords and **Regular Expressions**.
+* **Granular Filter Rules**: Listen to specific targets (chats, groups, channels, bots, or direct messages). Supports inclusive/exclusive keywords, **excluded senders (@username or User ID)**, and **Regular Expressions**.
+* **Message Debounce Window**: Configurable cooldown period (in seconds or minutes). Once a Webhook push is triggered, subsequent candidate messages within the debounce window are suppressed and reset/extend the debounce timer.
 * **Flexible Webhook Delivery**: Supports both `GET` and `POST` methods. 
   - **GET**: Parameters are safely appended as query strings if no placeholders are found.
   - **POST**: Fully custom JSON body structures with placeholder replacement, or fallback to the full system payload if left blank.
