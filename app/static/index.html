@@ -143,16 +143,16 @@
               <div class="p-4 bg-brand-dark/50 border border-brand-border hover:border-brand-border/80 rounded-xl flex items-center justify-between transition group">
                 <div class="flex items-center space-x-3">
                   <div class="w-10 h-10 rounded-lg flex items-center justify-center" 
-                       :class="acc.status === 'online' ? 'bg-emerald-500/10 text-emerald-400' : acc.status === 'logging_in' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'">
+                       :class="acc.status === 'online' ? 'bg-emerald-500/10 text-emerald-400' : (acc.status === 'connecting' || acc.status === 'logging_in') ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'">
                     <i data-lucide="send" class="w-5 h-5"></i>
                   </div>
                   <div>
                     <div class="text-sm font-semibold text-white" x-text="acc.phone"></div>
                     <div class="flex items-center space-x-1.5 mt-0.5">
                       <span class="w-1.5 h-1.5 rounded-full" 
-                            :class="acc.status === 'online' ? 'bg-emerald-400' : acc.status === 'logging_in' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"></span>
+                            :class="acc.status === 'online' ? 'bg-emerald-400' : (acc.status === 'connecting' || acc.status === 'logging_in') ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"></span>
                       <span class="text-xs text-gray-400" 
-                            x-text="acc.status === 'online' ? t('acc_status_online') : acc.status === 'logging_in' ? t('acc_status_logging') : t('acc_status_offline')"></span>
+                            x-text="acc.status === 'online' ? t('acc_status_online') : acc.status === 'connecting' ? t('acc_status_connecting') : acc.status === 'logging_in' ? t('acc_status_logging') : t('acc_status_offline')"></span>
                     </div>
                   </div>
                 </div>
@@ -216,6 +216,43 @@
                 <span x-show="testingWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
               <button @click="saveGlobalWebhook()" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span x-text="t('btn_save_config')"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 账号下线告警 Webhook 配置 -->
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
+            <h2 class="text-md font-bold text-white" x-text="t('card_offline_webhook')"></h2>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
+              <input type="url" x-model="offlineWebhook.url" placeholder="https://api.example.com/offline-webhook (留空则使用全局)" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm transition">
+              <p class="text-[11px] text-gray-500 mt-1" x-text="t('offline_webhook_hint')"></p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_method')"></label>
+              <select x-model="offlineWebhook.method" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white transition bg-brand-dark">
+                <option value="POST">POST (发送下线告警数据包)</option>
+                <option value="GET">GET (参数拼接/URL占位符)</option>
+              </select>
+            </div>
+            <div x-show="offlineWebhook.method === 'POST'">
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_custom_body')"></label>
+              <textarea x-model="offlineWebhook.custom_body" rows="3" placeholder='{"event": "account_offline", "phone": "{phone}", "reason": "{reason}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <button @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineWebhook"></i>
+                <span x-show="!testingOfflineWebhook" x-text="t('btn_test_conn')"></span>
+                <span x-show="testingOfflineWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+              <button @click="saveOfflineWebhook()" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
                 <i data-lucide="save" class="w-4 h-4"></i>
                 <span x-text="t('btn_save_config')"></span>
               </button>
@@ -852,9 +889,12 @@
             card_accounts: "Telegram 账号",
             btn_add_account: "添加账号",
             acc_status_online: "🟢 已在线",
+            acc_status_connecting: "🟡 重连中 / 保活中",
             acc_status_logging: "🟡 登录验证中",
             acc_status_offline: "🔴 离线 / 需登录",
             card_webhook: "全局 Webhook 配置",
+            card_offline_webhook: "账号下线告警 Webhook",
+            offline_webhook_hint: "当账号被踢下线或 Session 失效时触发通知告警（若留空则继承使用全局 Webhook）。",
             lbl_webhook_url: "默认 Webhook URL",
             webhook_hint: "匹配到规则的消息，默认会推送到该接口。",
             lbl_webhook_method: "请求方法 (Method)",
@@ -953,9 +993,12 @@
             card_accounts: "Telegram Accounts",
             btn_add_account: "Link Account",
             acc_status_online: "🟢 Online",
+            acc_status_connecting: "🟡 Reconnecting",
             acc_status_logging: "🟡 Logging in",
             acc_status_offline: "🔴 Offline",
             card_webhook: "Global Webhook Config",
+            card_offline_webhook: "Account Offline Webhook",
+            offline_webhook_hint: "Sent when an account goes offline or session expires (Uses Global Webhook if empty).",
             lbl_webhook_url: "Default Webhook URL",
             webhook_hint: "Messages matching active rules will be sent here.",
             lbl_webhook_method: "Request Method",
@@ -1051,12 +1094,14 @@
         accounts: [],
         rules: [],
         globalWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
+        offlineWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
         refreshing: false,
         
         // 帮助与诊断弹窗
         showHelpModal: false,
         showTestResultModal: false,
         testingWebhook: false,
+        testingOfflineWebhook: false,
         testResult: { status: "", code: null, elapsed: 0, response: "", error: "" },
         
         // 模态框开关
@@ -1225,7 +1270,8 @@
             await Promise.all([
               this.fetchAccounts(),
               this.fetchRules(),
-              this.fetchWebhookConfig()
+              this.fetchWebhookConfig(),
+              this.fetchOfflineWebhookConfig()
             ]);
             this.showToast("数据加载成功");
           } catch (e) {
@@ -1268,6 +1314,29 @@
             });
             if (res.ok) {
               this.showToast("全局 Webhook 保存成功");
+            } else {
+              this.showToast("保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败", "error");
+          }
+        },
+
+        async fetchOfflineWebhookConfig() {
+          try {
+            const res = await this.apiFetch("/api/config/offline-webhook");
+            this.offlineWebhook = await res.json();
+          } catch(e) {}
+        },
+
+        async saveOfflineWebhook() {
+          try {
+            const res = await this.apiFetch("/api/config/offline-webhook", {
+              method: "POST",
+              body: this.offlineWebhook
+            });
+            if (res.ok) {
+              this.showToast("账号下线 Webhook 保存成功");
             } else {
               this.showToast("保存失败", "error");
             }
@@ -1608,6 +1677,10 @@
             url = this.globalWebhook.url;
             method = this.globalWebhook.method;
             custom_body = this.globalWebhook.custom_body;
+          } else if (type === 'offline') {
+            url = this.offlineWebhook.url || this.globalWebhook.url;
+            method = this.offlineWebhook.method || this.globalWebhook.method;
+            custom_body = this.offlineWebhook.custom_body;
           } else {
             url = this.ruleForm.webhookUrl;
             method = this.ruleForm.webhookMethod || this.globalWebhook.method;
@@ -1619,7 +1692,11 @@
             return;
           }
 
-          this.testingWebhook = true;
+          if (type === 'offline') {
+            this.testingOfflineWebhook = true;
+          } else {
+            this.testingWebhook = true;
+          }
           try {
             const res = await this.apiFetch("/api/webhook/test", {
               method: "POST",
@@ -1638,6 +1715,7 @@
             this.showToast("请求测试 API 失败: " + e, "error");
           } finally {
             this.testingWebhook = false;
+            this.testingOfflineWebhook = false;
             this.$nextTick(() => lucide.createIcons());
           }
         }

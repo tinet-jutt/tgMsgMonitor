@@ -8,7 +8,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from telethon import TelegramClient, events
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import (
+    SessionPasswordNeededError,
+    AuthKeyUnregisteredError,
+    UserDeactivatedError,
+    UserDeactivatedBanError,
+    SessionRevokedError
+)
+from datetime import datetime
 from loguru import logger
 import httpx
 import secrets
@@ -53,6 +60,12 @@ class GlobalWebhookConfig(BaseModel):
     method: str = "POST"  # GET / POST
     custom_body: str = ""
 
+class OfflineWebhookConfig(BaseModel):
+    url: str = ""
+    timeout: int = 10
+    method: str = "POST"
+    custom_body: str = ""
+
 class RuleFilter(BaseModel):
     keywords: List[str] = []
     exclude_keywords: List[str] = []
@@ -84,6 +97,7 @@ class AccountModel(BaseModel):
 class SystemConfig(BaseModel):
     accounts: List[AccountModel] = []
     global_webhook: GlobalWebhookConfig = GlobalWebhookConfig()
+    offline_webhook: OfflineWebhookConfig = OfflineWebhookConfig()
     rules: List[RuleModel] = []
 
 # 登录 API 参数模型
@@ -118,6 +132,7 @@ class ConfigManager:
             "server": {"host": "0.0.0.0", "port": 8000},
             "accounts": [],
             "global_webhook": {"url": "", "timeout": 10, "method": "POST", "custom_body": ""},
+            "offline_webhook": {"url": "", "timeout": 10, "method": "POST", "custom_body": ""},
             "rules": []
         }
         self.load()
@@ -134,6 +149,9 @@ class ConfigManager:
                     updated = True
                 if "server" not in self.config:
                     self.config["server"] = {"host": "0.0.0.0", "port": 8000}
+                    updated = True
+                if "offline_webhook" not in self.config:
+                    self.config["offline_webhook"] = {"url": "", "timeout": 10, "method": "POST", "custom_body": ""}
                     updated = True
                 if updated:
                     self.save_sync()
@@ -190,21 +208,159 @@ class TelegramManager:
                 logger.info(f"正在自动启动账号监控: {phone}")
                 try:
                     session_path = os.path.join(SESSIONS_DIR, f"session_{phone}")
-                    client = TelegramClient(session_path, api_id, api_hash)
-                    await client.connect()
-                    
-                    if await client.is_user_authorized():
-                        self.active_clients[phone] = client
-                        self.register_handlers(phone, client)
-                        logger.info(f"账号 {phone} 自动连接并监听成功。")
-                    else:
-                        logger.warning(f"账号 {phone} 已失效或未授权，标记为未激活。")
-                        await client.disconnect()
-                        # 更新配置状态
-                        acc["is_active"] = False
-                        await self.config_manager.save_config(config)
+                    client = TelegramClient(session_path, api_id, api_hash, connection_retries=None, retry_delay=5)
+                    try:
+                        await client.connect()
+                    except Exception as conn_err:
+                        logger.warning(f"账号 {phone} 初始网络连接未就绪 (将由后台自动无缝重连): {conn_err}")
+
+                    self.active_clients[phone] = client
+                    self.register_handlers(phone, client)
+
+                    if client.is_connected():
+                        if await client.is_user_authorized():
+                            logger.info(f"账号 {phone} 自动连接并监听成功。")
+                        else:
+                            logger.warning(f"账号 {phone} 已失效或未授权，触发下线处理。")
+                            await self.handle_account_offline(phone, "Session 已失效或未获得授权。")
                 except Exception as e:
-                    logger.error(f"初始化账号 {phone} 失败: {e}")
+                    logger.error(f"初始化账号 {phone} 异常: {e}")
+
+    async def start_keepalive_daemon(self):
+        """后台保活与重连巡检协程，防网络波动断开"""
+        logger.info("已启动 Telegram 客户端保活守护任务。")
+        while True:
+            try:
+                await asyncio.sleep(30)
+                config = await self.config_manager.get_config()
+                accounts = config.get("accounts", [])
+                for acc in accounts:
+                    phone = acc.get("phone")
+                    is_active = acc.get("is_active", False)
+                    if not is_active:
+                        continue
+
+                    api_id = acc.get("api_id")
+                    api_hash = acc.get("api_hash")
+                    session_path = os.path.join(SESSIONS_DIR, f"session_{phone}")
+
+                    if phone in self.active_clients:
+                        client = self.active_clients[phone]
+                        if not client.is_connected():
+                            logger.warning(f"监测到账号 {phone} 连接中断，正在静默重连...")
+                            try:
+                                await client.connect()
+                                if await client.is_user_authorized():
+                                    logger.info(f"账号 {phone} 断线保活重连成功。")
+                                else:
+                                    logger.warning(f"账号 {phone} 重连后发现 Session 已失效。")
+                                    await self.handle_account_offline(phone, "Session 已失效或在其他设备已注销。")
+                            except Exception as e:
+                                logger.debug(f"账号 {phone} 重连尝试中 (网络波动): {e}")
+                    else:
+                        logger.info(f"尝试初始化并重新拉起账号 {phone}...")
+                        try:
+                            client = TelegramClient(session_path, api_id, api_hash, connection_retries=None, retry_delay=5)
+                            try:
+                                await client.connect()
+                            except Exception:
+                                pass
+
+                            self.active_clients[phone] = client
+                            self.register_handlers(phone, client)
+
+                            if client.is_connected():
+                                if await client.is_user_authorized():
+                                    logger.info(f"账号 {phone} 拉起并授权成功。")
+                                else:
+                                    logger.warning(f"账号 {phone} 已失效，触发下线。")
+                                    await self.handle_account_offline(phone, "Session 已失效或未获得授权。")
+                        except Exception as e:
+                            logger.debug(f"拉起账号 {phone} 失败 (网络不可达): {e}")
+            except Exception as e:
+                logger.error(f"保活守护巡检异常: {e}")
+
+    async def handle_account_offline(self, phone: str, reason: str = "账号已下线"):
+        """统一处理真实下线（被踢/封禁/Session失效）逻辑"""
+        logger.warning(f"正在执行账号下线注销流程 [{phone}]: {reason}")
+        if phone in self.active_clients:
+            client = self.active_clients.pop(phone)
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+
+        config = await self.config_manager.get_config()
+        updated = False
+        for acc in config.get("accounts", []):
+            if acc.get("phone") == phone and acc.get("is_active", False):
+                acc["is_active"] = False
+                updated = True
+                break
+        if updated:
+            await self.config_manager.save_config(config)
+
+        # 异步触发下线 Webhook 告警
+        asyncio.create_task(self.trigger_offline_webhook(phone, reason))
+
+    async def trigger_offline_webhook(self, phone: str, reason: str):
+        """触发账号下线 Webhook 告警通知"""
+        config = await self.config_manager.get_config()
+        offline_conf = config.get("offline_webhook", {})
+        url = offline_conf.get("url", "").strip()
+
+        if not url:
+            global_webhook = config.get("global_webhook", {})
+            url = global_webhook.get("url", "").strip()
+            timeout = global_webhook.get("timeout", 10)
+            method = global_webhook.get("method", "POST")
+            custom_body = global_webhook.get("custom_body", "")
+        else:
+            timeout = offline_conf.get("timeout", 10)
+            method = offline_conf.get("method", "POST")
+            custom_body = offline_conf.get("custom_body", "")
+
+        if not url:
+            logger.info("未配置账号下线 Webhook URL，跳过告警推送。")
+            return
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        placeholder_data = {
+            "receiver_account": phone,
+            "phone": phone,
+            "reason": reason,
+            "date": now_str,
+            "event": "account_offline",
+            "text": f"【账号下线告警】Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
+        }
+
+        final_url = resolve_placeholders(url, placeholder_data, method)
+        logger.info(f"正在发送账号下线 Webhook 告警 [{phone}] 到 {final_url}...")
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                if method.upper() == "GET":
+                    resp = await client.get(final_url)
+                else:
+                    if custom_body and custom_body.strip():
+                        resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
+                        try:
+                            payload = json.loads(resolved_body)
+                            resp = await client.post(final_url, json=payload)
+                        except json.JSONDecodeError:
+                            headers = {"Content-Type": "application/json"}
+                            resp = await client.post(final_url, content=resolved_body, headers=headers)
+                    else:
+                        payload = {
+                            "event": "account_offline",
+                            "phone": phone,
+                            "reason": reason,
+                            "date": now_str,
+                            "message": f"Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
+                        }
+                        resp = await client.post(final_url, json=payload)
+                logger.info(f"账号下线 Webhook 推送完成 [{phone}], 状态码: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"发送账号下线 Webhook 告警失败 [{phone}]: {e}")
 
     def register_handlers(self, phone: str, client: TelegramClient):
         """为指定账号注册新消息监听器"""
@@ -649,6 +805,8 @@ async def change_password(req: ChangePasswordReq):
 async def startup_event():
     # 异步初始化并自动登录已有 Session 的账号
     asyncio.create_task(tg_manager.init_and_start_active_accounts())
+    # 启动后台保活重连守护
+    asyncio.create_task(tg_manager.start_keepalive_daemon())
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -664,20 +822,28 @@ async def get_accounts():
     result = []
     for acc in accounts:
         phone = acc["phone"]
-        # 动态查询连接状态
+        is_active = acc.get("is_active", False)
+        
         status = "offline"
-        if phone in tg_manager.active_clients:
-            client = tg_manager.active_clients[phone]
-            if client.is_connected() and await client.is_user_authorized():
-                status = "online"
-        elif phone in tg_manager.login_clients:
+        if phone in tg_manager.login_clients:
             status = "logging_in"
+        elif is_active:
+            if phone in tg_manager.active_clients:
+                client = tg_manager.active_clients[phone]
+                if client.is_connected():
+                    status = "online"
+                else:
+                    status = "connecting"
+            else:
+                status = "connecting"
+        else:
+            status = "offline"
             
         result.append({
             "phone": phone,
             "api_id": acc["api_id"],
             "status": status,
-            "is_active": acc.get("is_active", False)
+            "is_active": is_active
         })
     return result
 
@@ -876,6 +1042,25 @@ async def update_webhook_config(webhook_conf: GlobalWebhookConfig):
     }
     await config_manager.save_config(config)
     return {"status": "success", "message": "全局 Webhook 配置已更新。"}
+
+# --- 账号下线 Webhook 配置 API ---
+
+@app.get("/api/config/offline-webhook", dependencies=[Depends(verify_token)])
+async def get_offline_webhook_config():
+    config = await config_manager.get_config()
+    return config.get("offline_webhook", {"url": "", "timeout": 10, "method": "POST", "custom_body": ""})
+
+@app.post("/api/config/offline-webhook", dependencies=[Depends(verify_token)])
+async def update_offline_webhook_config(webhook_conf: OfflineWebhookConfig):
+    config = await config_manager.get_config()
+    config["offline_webhook"] = {
+        "url": webhook_conf.url.strip(),
+        "timeout": webhook_conf.timeout,
+        "method": webhook_conf.method,
+        "custom_body": webhook_conf.custom_body
+    }
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "账号下线 Webhook 配置已更新。"}
 
 # --- Webhook 测试联调 API ---
 
