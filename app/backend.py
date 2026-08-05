@@ -1068,31 +1068,44 @@ class TestWebhookReq(BaseModel):
     url: str
     method: str = "POST"
     custom_body: str = ""
+    event_type: str = "message"  # "message" 或 "account_offline"
 
 @app.post("/api/webhook/test", dependencies=[Depends(verify_token)])
 async def test_webhook(req: TestWebhookReq):
     url = req.url.strip()
     method = req.method.strip().upper()
     custom_body = req.custom_body
+    event_type = req.event_type
 
     if not url:
         raise HTTPException(status_code=400, detail="Webhook URL 不能为空。")
 
-    # Mock 占位符数据
-    mock_placeholders = {
-        "text": "这是一条来自测试按钮的测试消息内容。",
-        "msg_id": 99999,
-        "date": "2026-07-11T21:48:47+08:00",
-        "sender_id": 12345678,
-        "sender_username": "test_sender",
-        "sender_name": "测试发送人",
-        "chat_id": -100123456,
-        "chat_title": "测试监控群组",
-        "chat_username": "test_group",
-        "receiver_account": "+8613800000000",
-        "rule_name": "测试规则",
-        "matched_keywords": "测试,监控"
-    }
+    if event_type == "account_offline":
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        mock_placeholders = {
+            "event": "account_offline",
+            "receiver_account": "+15407800413",
+            "phone": "+15407800413",
+            "reason": "Session 已失效或在其他设备已注销 (联调测试)",
+            "date": now_str,
+            "text": "【账号下线告警】Telegram 账号 [+15407800413] 已离线/需重新登录！原因：Session 已失效或在其他设备已注销 (联调测试)"
+        }
+    else:
+        mock_placeholders = {
+            "text": "这是一条来自测试按钮的测试消息内容。",
+            "msg_id": 99999,
+            "date": "2026-07-11T21:48:47+08:00",
+            "sender_id": 12345678,
+            "sender_username": "test_sender",
+            "sender_name": "测试发送人",
+            "chat_id": -100123456,
+            "chat_title": "测试监控群组",
+            "chat_username": "test_group",
+            "receiver_account": "+8613800000000",
+            "phone": "+8613800000000",
+            "rule_name": "测试规则",
+            "matched_keywords": "测试,监控"
+        }
 
     final_url = resolve_placeholders(url, mock_placeholders, method)
 
@@ -1112,29 +1125,38 @@ async def test_webhook(req: TestWebhookReq):
                         headers = {"Content-Type": "application/json"}
                         response = await client.post(final_url, content=resolved_body_str, headers=headers)
                 else:
-                    payload = {
-                        "rule_name": mock_placeholders["rule_name"],
-                        "receiver_account": mock_placeholders["receiver_account"],
-                        "matched_keywords": ["测试", "监控"],
-                        "message": {
-                            "id": mock_placeholders["msg_id"],
-                            "text": mock_placeholders["text"],
-                            "date": mock_placeholders["date"]
-                        },
-                        "sender": {
-                            "id": mock_placeholders["sender_id"],
-                            "username": mock_placeholders["sender_username"],
-                            "first_name": "测试",
-                            "last_name": "发送人",
-                            "is_bot": False
-                        },
-                        "chat": {
-                            "id": mock_placeholders["chat_id"],
-                            "title": mock_placeholders["chat_title"],
-                            "type": "supergroup",
-                            "username": mock_placeholders["chat_username"]
+                    if event_type == "account_offline":
+                        payload = {
+                            "event": "account_offline",
+                            "phone": mock_placeholders["phone"],
+                            "reason": mock_placeholders["reason"],
+                            "date": mock_placeholders["date"],
+                            "message": mock_placeholders["text"]
                         }
-                    }
+                    else:
+                        payload = {
+                            "rule_name": mock_placeholders["rule_name"],
+                            "receiver_account": mock_placeholders["receiver_account"],
+                            "matched_keywords": ["测试", "监控"],
+                            "message": {
+                                "id": mock_placeholders["msg_id"],
+                                "text": mock_placeholders["text"],
+                                "date": mock_placeholders["date"]
+                            },
+                            "sender": {
+                                "id": mock_placeholders["sender_id"],
+                                "username": mock_placeholders["sender_username"],
+                                "first_name": "测试",
+                                "last_name": "发送人",
+                                "is_bot": False
+                            },
+                            "chat": {
+                                "id": mock_placeholders["chat_id"],
+                                "title": mock_placeholders["chat_title"],
+                                "type": "supergroup",
+                                "username": mock_placeholders["chat_username"]
+                            }
+                        }
                     response = await client.post(final_url, json=payload)
 
             elapsed = round((time.time() - start_time) * 1000, 2)
