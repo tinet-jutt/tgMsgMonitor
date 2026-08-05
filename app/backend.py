@@ -31,7 +31,18 @@ username_to_id_cache: Dict[str, int] = {}
 
 import urllib.parse
 
-# ----------------- 占位符解析工具函数 -----------------
+# ----------------- 占位符解析与日期格式化工具函数 -----------------
+
+def format_datetime(dt=None) -> str:
+    """统一将 datetime 对象或当前时间格式化为 YYYY/MM/DD HH:mm (例如 2026/08/05 13:24)"""
+    if dt is None:
+        dt = datetime.now()
+    if hasattr(dt, 'astimezone'):
+        try:
+            dt = dt.astimezone()
+        except Exception:
+            pass
+    return dt.strftime("%Y/%m/%d %H:%M")
 
 def resolve_placeholders(url: str, placeholder_data: Dict[str, Any], method: str) -> str:
     """
@@ -324,7 +335,7 @@ class TelegramManager:
             logger.info("未配置账号下线 Webhook URL，跳过告警推送。")
             return
 
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = format_datetime()
         placeholder_data = {
             "receiver_account": phone,
             "phone": phone,
@@ -503,7 +514,7 @@ class TelegramManager:
             webhook_custom_body = rule_webhook.get("custom_body") if rule_webhook.get("url") else global_webhook.get("custom_body") or ""
 
             # 整理占位符所需的数据
-            message_date = event.message.date.isoformat() if (event.message and event.message.date) else ""
+            message_date = format_datetime(event.message.date) if (event.message and event.message.date) else format_datetime()
             sender_username = sender.username if sender and hasattr(sender, 'username') else ""
             sender_first = sender.first_name if sender and hasattr(sender, 'first_name') else ""
             sender_last = sender.last_name if sender and hasattr(sender, 'last_name') else ""
@@ -656,7 +667,7 @@ class TelegramManager:
                     else:
                         # B. 发送默认的完整系统 Payload
                         message_text = event.message.message or ""
-                        message_date = event.message.date.isoformat() if (event.message and event.message.date) else ""
+                        message_date = format_datetime(event.message.date) if (event.message and event.message.date) else format_datetime()
 
                         sender_info = {
                             "id": sender.id if sender else None,
@@ -1081,7 +1092,7 @@ async def test_webhook(req: TestWebhookReq):
         raise HTTPException(status_code=400, detail="Webhook URL 不能为空。")
 
     if event_type == "account_offline":
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = format_datetime()
         mock_placeholders = {
             "event": "account_offline",
             "receiver_account": "+15407800413",
@@ -1094,7 +1105,7 @@ async def test_webhook(req: TestWebhookReq):
         mock_placeholders = {
             "text": "这是一条来自测试按钮的测试消息内容。",
             "msg_id": 99999,
-            "date": "2026-07-11T21:48:47+08:00",
+            "date": "2026/08/05 13:24",
             "sender_id": 12345678,
             "sender_username": "test_sender",
             "sender_name": "测试发送人",

@@ -806,7 +806,7 @@
             <tr>
               <td class="p-3"><span @click="navigator.clipboard.writeText('{date}'); showToast(lang === 'zh' ? '已复制 {date}' : 'Copied {date}')" class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/10 rounded cursor-pointer font-mono font-bold select-none">{date}</span></td>
               <td class="p-3" x-text="t('placeholder_date_desc')"></td>
-              <td class="p-3">2026-07-11T21:48:47+08:00</td>
+              <td class="p-3">2026/08/05 13:24</td>
             </tr>
             <tr class="bg-amber-500/5">
               <td class="p-3"><span @click="navigator.clipboard.writeText('{phone}'); showToast(lang === 'zh' ? '已复制 {phone}' : 'Copied {phone}')" class="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded cursor-pointer font-mono font-bold select-none">{phone}</span></td>
@@ -1012,7 +1012,7 @@
             placeholder_msg_id_desc: "消息在 Telegram 中分配的唯一 ID",
             placeholder_chat_id_desc: "消息来源会话数字 ID",
             placeholder_sender_id_desc: "发送人数字 ID",
-            placeholder_date_desc: "消息时间 (ISO 格式字符串)"
+            placeholder_date_desc: "消息/事件时间 (格式如: 2026/08/05 13:24)"
           },
           en: {
             app_title: "TG Msg Monitor",
@@ -1116,7 +1116,7 @@
             placeholder_msg_id_desc: "Unique message ID under TG",
             placeholder_chat_id_desc: "Target chat integer ID",
             placeholder_sender_id_desc: "Sender user integer ID",
-            placeholder_date_desc: "Message ISO datetime string"
+            placeholder_date_desc: "Message/event datetime string (e.g., 2026/08/05 13:24)"
           }
         },
         t(key) {
