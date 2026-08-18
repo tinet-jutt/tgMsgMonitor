@@ -1387,16 +1387,6 @@
           </div>
         </div>
 
-          <div x-show="todoForm.confirm_type === 'manual'" class="pt-2">
-            <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_remind_interval')"></label>
-            <div class="relative">
-              <input type="number" x-model.number="todoForm.remind_interval_minutes" min="1" max="1440" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono">
-              <span class="absolute right-3 top-2 text-xs text-gray-500" x-text="lang === 'zh' ? '分钟' : 'mins'"></span>
-            </div>
-            <p class="text-[11px] text-gray-500 mt-1" x-text="t('remind_interval_hint')"></p>
-          </div>
-        </div>
-
         <!-- 专属 Webhook 覆盖配置 -->
         <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
           <label class="flex items-center space-x-2 cursor-pointer">
