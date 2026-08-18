@@ -78,6 +78,12 @@ class OfflineWebhookConfig(BaseModel):
     method: str = "POST"
     custom_body: str = ""
 
+class TodoWebhookConfig(BaseModel):
+    url: str = ""
+    timeout: int = 10
+    method: str = "POST"
+    custom_body: str = ""
+
 class RuleFilter(BaseModel):
     keywords: List[str] = []
     exclude_keywords: List[str] = []
@@ -133,6 +139,7 @@ class SystemConfig(BaseModel):
     accounts: List[AccountModel] = []
     global_webhook: GlobalWebhookConfig = GlobalWebhookConfig()
     offline_webhook: OfflineWebhookConfig = OfflineWebhookConfig()
+    todo_webhook: TodoWebhookConfig = TodoWebhookConfig()
     rules: List[RuleModel] = []
     todos: List[TodoModel] = []
 
@@ -827,22 +834,22 @@ class TodoManager:
     async def trigger_todo_webhook(self, todo: dict, is_retry: bool = False):
         """触发待办提醒 Webhook"""
         config = await self.config_manager.get_config()
-        global_webhook = config.get("global_webhook", {})
-        todo_webhook = todo.get("webhook", {})
+        default_todo_webhook = config.get("todo_webhook", {})
+        todo_custom_webhook = todo.get("webhook", {})
 
-        url = (todo_webhook.get("url") or "").strip()
+        url = (todo_custom_webhook.get("url") or "").strip()
         if not url:
-            url = (global_webhook.get("url") or "").strip()
-            timeout = global_webhook.get("timeout", 10)
-            method = global_webhook.get("method", "POST")
-            custom_body = global_webhook.get("custom_body", "")
+            url = (default_todo_webhook.get("url") or "").strip()
+            timeout = default_todo_webhook.get("timeout", 10)
+            method = default_todo_webhook.get("method", "POST")
+            custom_body = default_todo_webhook.get("custom_body", "")
         else:
-            timeout = global_webhook.get("timeout", 10)
-            method = todo_webhook.get("method") or global_webhook.get("method") or "POST"
-            custom_body = todo_webhook.get("custom_body", "")
+            timeout = default_todo_webhook.get("timeout", 10)
+            method = todo_custom_webhook.get("method") or default_todo_webhook.get("method") or "POST"
+            custom_body = todo_custom_webhook.get("custom_body", "")
 
         if not url:
-            logger.warning(f"待办 [{todo.get('title')}] 触发提醒，但未配置 Webhook URL，跳过发送。")
+            logger.warning(f"待办 [{todo.get('title')}] 触发提醒，但未配置待办 Webhook URL，跳过发送。")
             return
 
         now_str = format_datetime()
@@ -1338,6 +1345,25 @@ async def update_offline_webhook_config(webhook_conf: OfflineWebhookConfig):
     await config_manager.save_config(config)
     return {"status": "success", "message": "账号下线 Webhook 配置已更新。"}
 
+# --- 定时待办全局 Webhook 配置 API ---
+
+@app.get("/api/config/todo-webhook", dependencies=[Depends(verify_token)])
+async def get_todo_webhook_config():
+    config = await config_manager.get_config()
+    return config.get("todo_webhook", {"url": "", "timeout": 10, "method": "POST", "custom_body": ""})
+
+@app.post("/api/config/todo-webhook", dependencies=[Depends(verify_token)])
+async def update_todo_webhook_config(webhook_conf: TodoWebhookConfig):
+    config = await config_manager.get_config()
+    config["todo_webhook"] = {
+        "url": webhook_conf.url.strip(),
+        "timeout": webhook_conf.timeout,
+        "method": webhook_conf.method,
+        "custom_body": webhook_conf.custom_body
+    }
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "定时待办全局 Webhook 配置已更新。"}
+
 # --- Webhook 测试联调 API ---
 
 class TestWebhookReq(BaseModel):
@@ -1365,6 +1391,21 @@ async def test_webhook(req: TestWebhookReq):
             "reason": "Session 已失效或在其他设备已注销 (联调测试)",
             "date": now_str,
             "text": "【账号下线告警】Telegram 账号 [+15407800413] 已离线/需重新登录！原因：Session 已失效或在其他设备已注销 (联调测试)"
+        }
+    elif event_type == "todo_reminder":
+        now_str = format_datetime()
+        mock_placeholders = {
+            "event": "todo_reminder",
+            "todo_id": "mock_todo_test",
+            "title": "测试待办任务事项",
+            "content": "这是一条来自待办 Webhook 测试按钮的模拟测试内容。",
+            "target_date": now_str,
+            "due_date": now_str,
+            "date": now_str,
+            "confirm_type": "手动确认",
+            "is_recurring": "单次执行",
+            "status": "pending",
+            "text": f"【待办提醒】您的待办任务「测试待办任务事项」已到期！\n到期时间：{now_str}\n确认方式：手动确认\n任务内容：这是一条来自待办 Webhook 测试按钮的模拟测试内容。"
         }
     else:
         mock_placeholders = {
@@ -1407,6 +1448,19 @@ async def test_webhook(req: TestWebhookReq):
                             "phone": mock_placeholders["phone"],
                             "reason": mock_placeholders["reason"],
                             "date": mock_placeholders["date"],
+                            "message": mock_placeholders["text"]
+                        }
+                    elif event_type == "todo_reminder":
+                        payload = {
+                            "event": "todo_reminder",
+                            "is_retry": False,
+                            "todo_id": "mock_todo_test",
+                            "title": mock_placeholders["title"],
+                            "content": mock_placeholders["content"],
+                            "target_date": mock_placeholders["target_date"],
+                            "confirm_type": "manual",
+                            "is_recurring": False,
+                            "trigger_time": mock_placeholders["date"],
                             "message": mock_placeholders["text"]
                         }
                     else:
