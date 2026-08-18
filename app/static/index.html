@@ -127,6 +127,17 @@
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           <span x-text="t('sys_online')"></span>
         </span>
+        <!-- 版本与检查更新按钮 -->
+        <button @click="checkSystemUpdate(true)" 
+                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 relative border"
+                :class="hasNewUpdate ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-sm' : 'bg-brand-border/40 border-transparent hover:bg-brand-border hover:text-white text-gray-300'"
+                :title="t('btn_check_update')">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5" :class="hasNewUpdate ? 'text-amber-400 animate-spin' : 'text-indigo-400'"></i>
+          <span class="font-mono text-[11px]" x-text="systemVersion.version || 'v1.2.0'"></span>
+          <template x-if="hasNewUpdate">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-0.5 -right-0.5"></span>
+          </template>
+        </button>
         <!-- 语言切换按钮 -->
         <button @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" title="Switch Language">
           <i data-lucide="globe" class="w-3.5 h-3.5"></i>
@@ -1586,7 +1597,26 @@
             btn_save_todo: "保存待办任务",
             modal_reset_title: "重置并重新激活待办",
             lbl_reset_target: "重新设定目标时间",
-            btn_confirm_reset: "确认重置激活"
+            btn_confirm_reset: "确认重置激活",
+            // 系统更新
+            btn_check_update: "检查更新",
+            modal_update_title: "系统版本与在线更新",
+            modal_update_subtitle: "检测 GitHub 官方仓库最新版本并支持主动一键更新",
+            lbl_current_version: "当前运行版本",
+            lbl_latest_remote: "远程最新版本",
+            status_checking: "正在检测...",
+            tag_has_update: "可更新",
+            tag_latest: "最新",
+            status_connecting_github: "正在连接 GitHub API 获取最新 Commit 变更信息...",
+            status_updating_title: "正在执行系统更新与重建",
+            status_updating_desc: "已向更新服务触发指令，容器正在拉取最新 Docker 镜像并平滑重建重启，系统将自动检测服务恢复...",
+            lbl_update_log: "新版本更新内容 (Commit Log)",
+            lbl_update_tip_title: "主动更新说明",
+            lbl_update_tip_desc: "点击「立即开始更新」后，系统将自动触发拉取最新镜像并重启服务，过程大约需 10~30 秒，会话与数据将安全保留。",
+            msg_already_latest: "当前运行的已是最新版本，无需更新！",
+            lbl_last_checked: "上次检测时间",
+            btn_recheck_update: "重新检测",
+            btn_start_update: "立即开始更新"
           },
           en: {
             app_title: "TG Msg Monitor",
@@ -1755,7 +1785,26 @@
             btn_save_todo: "Save Todo",
             modal_reset_title: "Reset & Reactivate Todo",
             lbl_reset_target: "New Target Date & Time",
-            btn_confirm_reset: "Confirm Reactivate"
+            btn_confirm_reset: "Confirm Reactivate",
+            // System Updates
+            btn_check_update: "Check Updates",
+            modal_update_title: "System Version & Online Update",
+            modal_update_subtitle: "Check latest version from GitHub repository and trigger one-click update",
+            lbl_current_version: "Current Version",
+            lbl_latest_remote: "Latest Remote",
+            status_checking: "Checking...",
+            tag_has_update: "Update Available",
+            tag_latest: "Latest",
+            status_connecting_github: "Connecting to GitHub API to check latest commits...",
+            status_updating_title: "Executing System Update & Recreation",
+            status_updating_desc: "Triggered update command. Container is pulling latest Docker image and recreating. Reconnecting automatically...",
+            lbl_update_log: "New Release Commit Log",
+            lbl_update_tip_title: "Active Update Notice",
+            lbl_update_tip_desc: "Clicking 'Start Update' triggers image pulling and container recreation. Takes approx 10-30s; sessions and configs are preserved.",
+            msg_already_latest: "You are running the latest version!",
+            lbl_last_checked: "Last Checked",
+            btn_recheck_update: "Check Again",
+            btn_start_update: "Start Update Now"
           }
         },
         t(key) {
@@ -1855,6 +1904,23 @@
           webhookCustomBody: ""
         },
 
+        // 系统版本与在线更新状态
+        systemVersion: { version: "v1.2.0", commit_sha: "", commit_short: "" },
+        showUpdateModal: false,
+        checkingUpdate: false,
+        updatingSystem: false,
+        hasNewUpdate: false,
+        updateInfo: {
+          has_update: false,
+          commit_message: "",
+          commit_date: "",
+          latest_commit_short: "",
+          current_commit_short: "",
+          commit_url: "",
+          check_time: "",
+          error: ""
+        },
+
         get pendingConfirmCount() {
           return this.todos.filter(t => t.status === 'pending_confirm' && t.is_enabled).length;
         },
@@ -1873,6 +1939,8 @@
         init() {
           if (this.isLoggedIn) {
             this.refreshData();
+            this.fetchSystemVersion();
+            this.checkSystemUpdate(false);
           } else {
             this.$nextTick(() => lucide.createIcons());
           }
@@ -2744,6 +2812,104 @@
           } catch(e) {
             this.showToast("网络请求异常", "error");
           }
+        },
+
+        // --- 系统版本与在线更新函数 ---
+        async fetchSystemVersion() {
+          try {
+            const res = await this.apiFetch("/api/system/version");
+            if (res.ok) {
+              this.systemVersion = await res.json();
+              this.$nextTick(() => lucide.createIcons());
+            }
+          } catch(e) {}
+        },
+
+        async checkSystemUpdate(openModal = false) {
+          this.checkingUpdate = true;
+          if (openModal) {
+            this.showUpdateModal = true;
+          }
+          try {
+            const res = await this.apiFetch("/api/system/check-update");
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'success') {
+                this.updateInfo = data;
+                this.hasNewUpdate = !!data.has_update;
+                if (data.current_version) {
+                  this.systemVersion.version = data.current_version;
+                  this.systemVersion.commit_short = data.current_commit_short;
+                }
+              } else {
+                this.updateInfo = {
+                  has_update: false,
+                  error: data.error || "未能获取版本信息"
+                };
+              }
+            }
+          } catch(e) {
+            this.updateInfo = {
+              has_update: false,
+              error: "网络请求异常，无法连接更新服务"
+            };
+          } finally {
+            this.checkingUpdate = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        async triggerSystemUpdate() {
+          this.updatingSystem = true;
+          try {
+            const res = await this.apiFetch("/api/system/trigger-update", { method: "POST" });
+            const data = await res.json();
+            if (data.status === 'success') {
+              this.showToast(data.message);
+              // 开始轮询服务重启恢复
+              this.pollSystemOnlineAfterUpdate();
+            } else if (data.status === 'manual_required') {
+              this.updatingSystem = false;
+              this.showToast(data.message, "info");
+              if (data.command) {
+                navigator.clipboard.writeText(data.command);
+                this.showToast(this.lang === 'zh' ? "更新命令已复制到剪贴板" : "Update command copied to clipboard");
+              }
+            } else {
+              this.updatingSystem = false;
+              this.showToast(data.message || "更新触发失败", "error");
+            }
+          } catch(e) {
+            // 容器可能在重启中导致连接断开，进入轮询
+            this.pollSystemOnlineAfterUpdate();
+          }
+        },
+
+        pollSystemOnlineAfterUpdate() {
+          let retryCount = 0;
+          const maxRetries = 30; // 最多探测 60 秒
+          const interval = setInterval(async () => {
+            retryCount++;
+            try {
+              const res = await fetch("/api/system/version", { cache: "no-cache" });
+              if (res.status === 200 || res.status === 401) {
+                clearInterval(interval);
+                this.updatingSystem = false;
+                this.showUpdateModal = false;
+                this.showToast(this.lang === 'zh' ? "🎉 系统已更新完毕并恢复运行！" : "🎉 System updated successfully!");
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+              }
+            } catch(e) {
+              // 仍处于重启离线中
+            }
+            if (retryCount >= maxRetries) {
+              clearInterval(interval);
+              this.updatingSystem = false;
+              this.showToast(this.lang === 'zh' ? "更新服务响应超时，请手动刷新页面尝试" : "Update timeout, please refresh manually", "error");
+            }
+          }, 2000);
         }
       }
     }

@@ -15,8 +15,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY main.py .
 
+# 构建参数与版本环境变量注入
+ARG APP_COMMIT_SHA="dev"
+ARG APP_VERSION="v1.2.0"
+ENV APP_COMMIT_SHA=${APP_COMMIT_SHA}
+ENV APP_VERSION=${APP_VERSION}
+
 # 声明容器内部服务暴露的端口
 EXPOSE 8010
 
 # 启动应用程序
 CMD ["python", "main.py"]
+

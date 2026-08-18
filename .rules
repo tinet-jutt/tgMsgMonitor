@@ -1,0 +1,24 @@
+# Project Rules
+
+<!-- project-rules:managed:start -->
+## Project Snapshot
+
+- Root: `/Users/tomato/Task/github/tgMsgMonitor`
+- Last refreshed: 2026-08-18
+- Signal files: `README.md`, `requirements.txt`, `docker-compose.yml`
+- Top-level entries: `__pycache__/`, `app/`, `config.json`, `config.json.example`, `docker-compose.yml`, `Dockerfile`, `main.py`, `README.md`, `requirements.txt`, `sessions/`, `task.md`
+
+<!-- project-rules:managed:end -->
+
+## Project Rules
+
+- 生产环境服务器连接：可通过 `vps2` 命令（对应 `ssh -A -p 22 root@154.12.85.111`）连接。
+- 生产环境部署目录：`/root/APP/tgMsgMonitor`。
+- 部署模式与容器：Docker Compose 部署，容器名为 `tg_msg_monitor`，网络模式映射本地 `127.0.0.1:8010`。
+- 镜像自动构建与更新说明：
+  - GitHub Actions 在 `main` 分支有 push 时会自动构建 `ghcr.io/tinet-jutt/tgmsgmonitor:latest`。
+  - 远程服务器上的 Watchtower 目前未监听 `tg_msg_monitor`，更新版本需在服务器端进入 `/root/APP/tgMsgMonitor` 执行 `docker compose pull && docker compose up -d`（或配置 Watchtower）。
+
+## Learned Experience
+
+- 2026-08-18 (生产环境部署): 生产环境服务器可通过 `vps2` 命令 (即 `ssh -A -p 22 root@154.12.85.111`) 连接；项目部署目录位于 `/root/APP/tgMsgMonitor`。容器更新命令为 `cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d`。

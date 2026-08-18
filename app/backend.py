@@ -1671,3 +1671,150 @@ async def trigger_test_todo(todo_id: str):
     asyncio.create_task(todo_manager.trigger_todo_webhook(todo, is_retry=False))
     return {"status": "success", "message": f"已向待办「{todo.get('title')}」的 Webhook 发送测试提醒！"}
 
+
+# ----------------- 系统版本与在线更新检测/触发 API -----------------
+
+APP_VERSION = os.getenv("APP_VERSION", "v1.2.0")
+APP_COMMIT_SHA = os.getenv("APP_COMMIT_SHA", "")
+
+def get_current_version_info() -> Dict[str, str]:
+    """获取当前系统运行的版本号与 Commit SHA"""
+    sha = APP_COMMIT_SHA
+    if not sha or sha == "dev":
+        try:
+            import subprocess
+            out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, timeout=2).decode().strip()
+            if out:
+                sha = out
+        except Exception:
+            pass
+    if not sha:
+        sha = "7b0dbd6"
+    return {
+        "version": APP_VERSION,
+        "commit_sha": sha,
+        "commit_short": sha[:7] if sha else "unknown"
+    }
+
+async def check_github_update() -> Dict[str, Any]:
+    """检测 GitHub 远程仓库最新 Commit"""
+    current = get_current_version_info()
+    current_sha = current["commit_sha"]
+    url = "https://api.github.com/repos/tinet-jutt/tgMsgMonitor/commits/main"
+    headers = {
+        "User-Agent": "tgMsgMonitor-AutoUpdater/1.0",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                latest_sha = data.get("sha", "")
+                commit_info = data.get("commit", {})
+                message = commit_info.get("message", "").strip()
+                date_str = commit_info.get("committer", {}).get("date") or commit_info.get("author", {}).get("date", "")
+                
+                # 转换显示时间为标准格式
+                if date_str:
+                    try:
+                        dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+                        dt = dt + timedelta(hours=8)
+                        date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        pass
+
+                has_update = (latest_sha[:7].lower() != current_sha[:7].lower()) if (latest_sha and current_sha) else False
+                return {
+                    "status": "success",
+                    "has_update": has_update,
+                    "current_version": current["version"],
+                    "current_commit": current_sha,
+                    "current_commit_short": current["commit_short"],
+                    "latest_commit": latest_sha,
+                    "latest_commit_short": latest_sha[:7] if latest_sha else "",
+                    "commit_message": message,
+                    "commit_date": date_str,
+                    "commit_url": data.get("html_url", ""),
+                    "check_time": format_datetime()
+                }
+            else:
+                return {
+                    "status": "error",
+                    "has_update": False,
+                    "error": f"GitHub API 返回状态码 {resp.status_code}",
+                    "current_version": current["version"],
+                    "current_commit_short": current["commit_short"]
+                }
+    except Exception as e:
+        logger.error(f"检查更新异常: {e}")
+        return {
+            "status": "error",
+            "has_update": False,
+            "error": f"连接 GitHub 失败: {str(e)}",
+            "current_version": current["version"],
+            "current_commit_short": current["commit_short"]
+        }
+
+async def trigger_system_update() -> Dict[str, Any]:
+    """主动触发系统镜像拉取更新与平滑重建"""
+    # 1. 优先使用 Watchtower HTTP API 触发容器镜像更新
+    watchtower_url = os.getenv("WATCHTOWER_API_URL", "http://172.17.0.1:8088/v1/update")
+    watchtower_token = os.getenv("WATCHTOWER_API_TOKEN", "admin123-update-token")
+    headers = {"Authorization": f"Bearer {watchtower_token}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(watchtower_url, headers=headers)
+            if resp.status_code in (200, 204):
+                logger.info("已成功向 Watchtower 发送更新指令！")
+                return {
+                    "status": "success",
+                    "mode": "watchtower",
+                    "message": "已向 Watchtower 触发自动更新指令，系统正在后台拉取最新镜像并平滑重建容器，请在 10~20 秒后刷新页面。"
+                }
+            else:
+                logger.warning(f"Watchtower API 返回 HTTP {resp.status_code}")
+    except Exception as e:
+        logger.info(f"Watchtower API 连接失败 ({e})，尝试检测本地环境...")
+
+    # 2. 如果在本地 Git 开发环境直接运行
+    try:
+        import subprocess
+        is_git_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
+        if is_git_repo:
+            pull_res = subprocess.run(["git", "pull", "origin", "main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+            if pull_res.returncode == 0:
+                return {
+                    "status": "success",
+                    "mode": "git",
+                    "message": f"Git 代码更新成功：{pull_res.stdout.strip()}。"
+                }
+    except Exception:
+        pass
+
+    # 3. 兜底提示手动更新指令
+    return {
+        "status": "manual_required",
+        "mode": "manual",
+        "message": "未能直接调用 Watchtower 自动更新。您可以在服务器终端执行以下命令拉取最新镜像并重启：",
+        "command": "cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d"
+    }
+
+@app.get("/api/system/version", dependencies=[Depends(verify_token)])
+async def get_system_version():
+    """获取当前系统运行版本信息"""
+    return get_current_version_info()
+
+@app.get("/api/system/check-update", dependencies=[Depends(verify_token)])
+async def check_update():
+    """在线检测 GitHub 是否有新版本发布"""
+    return await check_github_update()
+
+@app.post("/api/system/trigger-update", dependencies=[Depends(verify_token)])
+async def trigger_update():
+    """主动触发系统在线更新"""
+    return await trigger_system_update()
+
+
