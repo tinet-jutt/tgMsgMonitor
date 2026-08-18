@@ -16,9 +16,12 @@
 - 生产环境部署目录：`/root/APP/tgMsgMonitor`。
 - 部署模式与容器：Docker Compose 部署，容器名为 `tg_msg_monitor`，网络模式映射本地 `127.0.0.1:8010`。
 - 镜像自动构建与更新说明：
-  - GitHub Actions 在 `main` 分支有 push 时会自动构建 `ghcr.io/tinet-jutt/tgmsgmonitor:latest`。
-  - 远程服务器上的 Watchtower 目前未监听 `tg_msg_monitor`，更新版本需在服务器端进入 `/root/APP/tgMsgMonitor` 执行 `docker compose pull && docker compose up -d`（或配置 Watchtower）。
+  - GitHub Actions 在 `main` 分支有 push 时会自动构建发布 `ghcr.io/tinet-jutt/tgmsgmonitor:latest`。
+  - 生产环境服务器上的 Watchtower 服务已配置监控 `tg_msg_monitor`：
+    - **定时巡检周期**：每 **30 分钟** (1800 秒) 自动轮询检查 GHCR 镜像并在发现新版本时自动更新。
+    - **主动即时更新**：在 Web 界面中点击「检查更新」->「立即开始更新」即可通过 HTTP API 触发立即更新（约 10~20 秒内完成）。
+    - **手动更新命令**：`cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d`。
 
 ## Learned Experience
 
-- 2026-08-18 (生产环境部署): 生产环境服务器可通过 `vps2` 命令 (即 `ssh -A -p 22 root@154.12.85.111`) 连接；项目部署目录位于 `/root/APP/tgMsgMonitor`。容器更新命令为 `cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d`。
+- 2026-08-18 (生产环境部署): 生产环境服务器可通过 `vps2` 命令 (即 `ssh -A -p 22 root@154.12.85.111`) 连接；项目部署目录位于 `/root/APP/tgMsgMonitor`。Watchtower 已开启对 `tg_msg_monitor` 的 30 分钟定时巡检及 HTTP 即时更新 API。
