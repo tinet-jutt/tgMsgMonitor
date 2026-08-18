@@ -415,7 +415,10 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-brand-dark/40 p-4 rounded-lg border border-brand-border/40">
                   <div class="space-y-2">
                     <div>
-                      <span class="text-gray-500 font-medium block mb-1">🎯 <span x-text="lang === 'zh' ? '监听目标聊天 (Chats)' : 'Listen Target Chats'"></span></span>
+                      <span class="text-gray-500 font-medium flex items-center space-x-1.5 mb-1.5">
+                        <i data-lucide="target" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span x-text="lang === 'zh' ? '监听目标聊天 (Chats)' : 'Listen Target Chats'"></span>
+                      </span>
                       <div class="flex flex-wrap gap-1.5">
                         <template x-for="t in rule.targets" :key="t">
                           <span class="px-2 py-0.5 bg-brand-border rounded text-gray-300 font-semibold" x-text="t"></span>
@@ -426,10 +429,16 @@
                   
                   <div class="space-y-2">
                     <div>
-                      <span class="text-gray-500 font-medium block mb-1">🔍 <span x-text="lang === 'zh' ? '匹配关键字 (Keywords)' : 'Matching Filters'"></span></span>
+                      <span class="text-gray-500 font-medium flex items-center space-x-1.5 mb-1.5">
+                        <i data-lucide="filter" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span x-text="lang === 'zh' ? '匹配关键字 (Keywords)' : 'Matching Filters'"></span>
+                      </span>
                       <div class="flex flex-wrap gap-1.5">
                         <template x-if="rule.filters.keywords.length === 0 && (!rule.filters.exclude_keywords || rule.filters.exclude_keywords.length === 0) && (!rule.filters.exclude_senders || rule.filters.exclude_senders.length === 0)">
-                          <span class="text-emerald-400 font-medium" x-text="lang === 'zh' ? '📢 监听全部消息 (全量)' : '📢 Forwarding All Messages'"></span>
+                          <span class="text-emerald-400 font-medium flex items-center space-x-1">
+                            <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+                            <span x-text="lang === 'zh' ? '监听全部消息 (全量)' : 'Forwarding All Messages'"></span>
+                          </span>
                         </template>
                         <template x-if="rule.filters.keywords.length === 0 && ((rule.filters.exclude_keywords && rule.filters.exclude_keywords.length > 0) || (rule.filters.exclude_senders && rule.filters.exclude_senders.length > 0))">
                           <span class="text-gray-400 font-medium" x-text="lang === 'zh' ? '未限制包含词 (仅条件过滤)' : 'Any message (conditional filter)'"></span>
@@ -442,7 +451,10 @@
                     
                     <template x-if="rule.filters.exclude_keywords && rule.filters.exclude_keywords.length > 0">
                       <div class="mt-2">
-                        <span class="text-gray-500 font-medium block mb-1">🚫 <span x-text="lang === 'zh' ? '排除关键字 (Blocklist)' : 'Exclude Keywords'"></span></span>
+                        <span class="text-gray-500 font-medium flex items-center space-x-1.5 mb-1.5">
+                          <i data-lucide="ban" class="w-3.5 h-3.5 text-red-400"></i>
+                          <span x-text="lang === 'zh' ? '排除关键字 (Blocklist)' : 'Exclude Keywords'"></span>
+                        </span>
                         <div class="flex flex-wrap gap-1.5">
                           <template x-for="ex in rule.filters.exclude_keywords" :key="ex">
                             <span class="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/10 rounded line-through" x-text="ex"></span>
@@ -453,7 +465,10 @@
 
                     <template x-if="rule.filters.exclude_senders && rule.filters.exclude_senders.length > 0">
                       <div class="mt-2">
-                        <span class="text-gray-500 font-medium block mb-1">👤 <span x-text="lang === 'zh' ? '排除发送者 (Blocked Senders)' : 'Exclude Senders'"></span></span>
+                        <span class="text-gray-500 font-medium flex items-center space-x-1.5 mb-1.5">
+                          <i data-lucide="user-x" class="w-3.5 h-3.5 text-amber-400"></i>
+                          <span x-text="lang === 'zh' ? '排除发送者 (Blocked Senders)' : 'Exclude Senders'"></span>
+                        </span>
                         <div class="flex flex-wrap gap-1.5">
                           <template x-for="sender in rule.filters.exclude_senders" :key="sender">
                             <span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/10 rounded font-mono text-xs line-through" x-text="sender.startsWith('@') || /^\d+$/.test(sender) ? sender : '@' + sender"></span>
@@ -626,15 +641,17 @@
                     </template>
 
                     <!-- 执行模式徽章 -->
-                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium font-mono"
-                          :class="todo.is_recurring ? 'bg-purple-500/10 text-purple-300 border-purple-500/30' : 'bg-slate-500/10 text-slate-300 border-slate-500/30'"
-                          x-text="todo.is_recurring ? (lang === 'zh' ? `🔁 循环 (每 ${todo.repeat_interval_value} ${formatUnitText(todo.repeat_interval_unit)})` : `🔁 Recurring (${todo.repeat_interval_value} ${todo.repeat_interval_unit})`) : t('todo_tag_once')">
+                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium font-mono flex items-center space-x-1"
+                          :class="todo.is_recurring ? 'bg-purple-500/10 text-purple-300 border-purple-500/30' : 'bg-slate-500/10 text-slate-300 border-slate-500/30'">
+                      <i :data-lucide="todo.is_recurring ? 'repeat' : 'zap'" class="w-3 h-3"></i>
+                      <span x-text="todo.is_recurring ? (lang === 'zh' ? `循环 (每 ${todo.repeat_interval_value} ${formatUnitText(todo.repeat_interval_unit)})` : `Recurring (${todo.repeat_interval_value} ${todo.repeat_interval_unit})`) : t('todo_tag_once')"></span>
                     </span>
 
                     <!-- 确认方式徽章 -->
-                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium"
-                          :class="todo.confirm_type === 'manual' ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-teal-500/10 text-teal-300 border-teal-500/30'"
-                          x-text="todo.confirm_type === 'manual' ? (lang === 'zh' ? `👆 手动确认 (催办每 ${todo.remind_interval_minutes}m)` : `👆 Manual Confirm (${todo.remind_interval_minutes}m retry)`) : t('todo_tag_auto_confirm')">
+                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium flex items-center space-x-1"
+                          :class="todo.confirm_type === 'manual' ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-teal-500/10 text-teal-300 border-teal-500/30'">
+                      <i :data-lucide="todo.confirm_type === 'manual' ? 'hand' : 'bot'" class="w-3 h-3"></i>
+                      <span x-text="todo.confirm_type === 'manual' ? (lang === 'zh' ? `手动确认 (催办每 ${todo.remind_interval_minutes}m)` : `Manual Confirm (${todo.remind_interval_minutes}m retry)`) : t('todo_tag_auto_confirm')"></span>
                     </span>
 
                     <!-- 标题 -->
@@ -1140,7 +1157,10 @@
         <div class="p-4 rounded-xl border flex items-center justify-between"
              :class="testResult.status === 'success' ? (testResult.code >= 200 && testResult.code < 300 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400') : 'bg-red-500/10 border-red-500/20 text-red-400'">
           <div>
-            <span class="font-bold text-sm block" x-text="testResult.status === 'success' ? t('test_success') : t('test_failed')"></span>
+            <div class="flex items-center space-x-1.5">
+              <i :data-lucide="testResult.status === 'success' ? 'check-circle-2' : 'alert-circle'" class="w-4 h-4"></i>
+              <span class="font-bold text-sm" x-text="testResult.status === 'success' ? t('test_success') : t('test_failed')"></span>
+            </div>
             <span class="mt-1 block text-gray-400">
               <span x-text="t('lbl_http_code')"></span>: <span class="font-bold text-white" x-text="testResult.code || '无'"></span> | <span x-text="lang === 'zh' ? '响应耗时' : 'Latency'"></span>: <span class="font-bold text-white" x-text="testResult.elapsed + ' ms'"></span>
             </span>
@@ -1225,15 +1245,21 @@
           <label class="block text-xs font-semibold text-indigo-400 uppercase tracking-wider" x-text="t('lbl_date_mode')"></label>
           
           <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.dateMode === 'offset_days' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" value="offset_days" x-model="todoForm.dateMode" class="text-indigo-600 focus:ring-0">
-              <span class="text-xs font-semibold" x-text="t('mode_offset_days')"></span>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span x-text="t('mode_offset_days')"></span>
+              </div>
             </label>
-            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.dateMode === 'exact_datetime' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" value="exact_datetime" x-model="todoForm.dateMode" class="text-indigo-600 focus:ring-0">
-              <span class="text-xs font-semibold" x-text="t('mode_exact_datetime')"></span>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span x-text="t('mode_exact_datetime')"></span>
+              </div>
             </label>
           </div>
 
@@ -1267,7 +1293,10 @@
 
             <!-- 动态推算结果展示横幅 -->
             <div class="p-2.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs flex items-center justify-between">
-              <span class="text-indigo-300 font-medium" x-text="t('lbl_calc_target')"></span>
+              <div class="text-indigo-300 font-medium flex items-center space-x-1.5">
+                <i data-lucide="calculator" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span x-text="t('lbl_calc_target')"></span>
+              </div>
               <span class="text-white font-mono font-bold" x-text="computeOffsetTarget()"></span>
             </div>
           </div>
@@ -1293,15 +1322,21 @@
         <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
           <label class="block text-xs font-semibold text-purple-400 uppercase tracking-wider" x-text="t('lbl_exec_mode')"></label>
           <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="!todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" :value="false" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
-              <span class="text-xs font-semibold" x-text="t('mode_once')"></span>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-purple-400"></i>
+                <span x-text="t('mode_once')"></span>
+              </div>
             </label>
-            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" :value="true" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
-              <span class="text-xs font-semibold" x-text="t('mode_recurring')"></span>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="repeat" class="w-3.5 h-3.5 text-purple-400"></i>
+                <span x-text="t('mode_recurring')"></span>
+              </div>
             </label>
           </div>
 
@@ -1327,18 +1362,30 @@
             <label class="flex items-start space-x-2.5 p-3 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.confirm_type === 'auto' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" value="auto" x-model="todoForm.confirm_type" class="text-amber-600 focus:ring-0 mt-0.5">
-              <div>
-                <div class="text-xs font-semibold" x-text="t('mode_auto_confirm')"></div>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="bot" class="w-3.5 h-3.5 text-teal-400 shrink-0"></i>
+                <span x-text="t('mode_auto_confirm')"></span>
               </div>
             </label>
             <label class="flex items-start space-x-2.5 p-3 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.confirm_type === 'manual' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-brand-border text-gray-400'">
               <input type="radio" value="manual" x-model="todoForm.confirm_type" class="text-amber-600 focus:ring-0 mt-0.5">
-              <div>
-                <div class="text-xs font-semibold" x-text="t('mode_manual_confirm')"></div>
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="hand" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+                <span x-text="t('mode_manual_confirm')"></span>
               </div>
             </label>
           </div>
+
+          <div x-show="todoForm.confirm_type === 'manual'" class="pt-2">
+            <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_remind_interval')"></label>
+            <div class="relative">
+              <input type="number" x-model.number="todoForm.remind_interval_minutes" min="1" max="1440" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+              <span class="absolute right-3 top-2 text-xs text-gray-500" x-text="lang === 'zh' ? '分钟' : 'mins'"></span>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1" x-text="t('remind_interval_hint')"></p>
+          </div>
+        </div>
 
           <div x-show="todoForm.confirm_type === 'manual'" class="pt-2">
             <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_remind_interval')"></label>
@@ -1444,10 +1491,10 @@
             login_hint: "默认密码为 admin，请进入后台后及时修改",
             card_accounts: "Telegram 账号",
             btn_add_account: "添加账号",
-            acc_status_online: "🟢 已在线",
-            acc_status_connecting: "🟡 重连中 / 保活中",
-            acc_status_logging: "🟡 登录验证中",
-            acc_status_offline: "🔴 离线 / 需登录",
+            acc_status_online: "已在线",
+            acc_status_connecting: "重连中 / 保活中",
+            acc_status_logging: "登录验证中",
+            acc_status_offline: "离线 / 需登录",
             card_webhook: "全局 Webhook 配置",
             card_offline_webhook: "账号下线告警 Webhook",
             offline_webhook_hint: "当账号被踢下线或 Session 失效时触发通知告警（若留空则继承使用全局 Webhook）。",
@@ -1472,8 +1519,8 @@
             rule_disabled: "已暂停",
             btn_edit: "编辑",
             btn_delete: "删除",
-            rule_filter_all: "📢 监听所有消息 (全量)",
-            rule_filter_kw: "🔍 按关键字过滤",
+            rule_filter_all: "监听所有消息 (全量)",
+            rule_filter_kw: "按关键字过滤",
             rule_regex_active: "正则模式",
             rule_override_webhook: "覆盖全局 Webhook",
             // 登录弹窗
@@ -1512,8 +1559,8 @@
             btn_confirm_pwd: "确认修改密码",
             // Webhook 测试结果诊断弹窗
             modal_test_title: "Webhook 连接测试诊断结果",
-            test_success: "🚀 测试发送完成",
-            test_failed: "❌ 发送失败",
+            test_success: "测试发送完成",
+            test_failed: "发送失败",
             lbl_http_code: "HTTP 状态码",
             lbl_response_body: "下游 Webhook 响应数据 (前 1000 字符)：",
             lbl_error_stack: "异常堆栈 / 错误原因：",
@@ -1549,15 +1596,15 @@
             filter_completed: "已完成",
             no_todos_title: "暂无待办提醒任务",
             no_todos_desc: "点击右上角「新建待办提醒」，支持根据具体日期或未来天数智能推算提醒时间，并配置单次或循环 Webhook 触发。",
-            todo_status_pending: "⏳ 等待到期",
-            todo_status_confirming: "🚨 待确认 (催办中)",
-            todo_status_completed: "✅ 已完成",
-            todo_status_disabled: "⏸️ 已暂停",
-            todo_status_overdue: "⚠️ 已到期待办",
-            todo_tag_once: "⚡ 单次执行",
-            todo_tag_recurring: "🔁 循环执行",
-            todo_tag_auto_confirm: "🤖 自动确认",
-            todo_tag_manual_confirm: "👆 手动确认",
+            todo_status_pending: "等待到期",
+            todo_status_confirming: "待确认 (催办中)",
+            todo_status_completed: "已完成",
+            todo_status_disabled: "已暂停",
+            todo_status_overdue: "已到期待办",
+            todo_tag_once: "单次执行",
+            todo_tag_recurring: "循环执行",
+            todo_tag_auto_confirm: "自动确认",
+            todo_tag_manual_confirm: "手动确认",
             lbl_target_time: "设定目标时间",
             lbl_remaining_time: "距离待办时间",
             lbl_created_at: "创建时间",
@@ -1573,15 +1620,15 @@
             lbl_todo_content: "待办内容与详情 (可选)",
             ph_todo_content: "请在此输入任务具体说明、备忘要点或操作提示...",
             lbl_date_mode: "日期设定方式",
-            mode_offset_days: "📅 指定未来天数 (智能推算)",
-            mode_exact_datetime: "⏰ 选择具体日期时间",
+            mode_offset_days: "指定未来天数 (智能推算)",
+            mode_exact_datetime: "选择具体日期时间",
             lbl_offset_days: "未来天数 (天后)",
             lbl_offset_time: "当天提醒时间",
-            lbl_calc_target: "💡 智能推算目标时间：",
+            lbl_calc_target: "智能推算目标时间：",
             lbl_exact_datetime: "具体到期时间",
             lbl_exec_mode: "执行模式",
-            mode_once: "⚡ 单次执行 (到期完成)",
-            mode_recurring: "🔁 循环执行 (按周期重复)",
+            mode_once: "单次执行 (到期完成)",
+            mode_recurring: "循环执行 (按周期重复)",
             lbl_repeat_interval: "循环周期",
             unit_minutes: "分钟",
             unit_hours: "小时",
@@ -1589,8 +1636,8 @@
             unit_weeks: "周",
             unit_months: "个月",
             lbl_confirm_mode: "确认机制",
-            mode_auto_confirm: "🤖 自动确认 (到期自动发送 1 次 Webhook 并完成/进入下周期)",
-            mode_manual_confirm: "👆 手动确认 (到期触发后必须手动点击完成，未完成则持续催办)",
+            mode_auto_confirm: "自动确认 (到期自动发送 1 次 Webhook 并完成/进入下周期)",
+            mode_manual_confirm: "手动确认 (到期触发后必须手动点击完成，未完成则持续催办)",
             lbl_remind_interval: "未确认催办间隔 (分钟)",
             remind_interval_hint: "当任务到期后未手动确认时，系统每隔指定分钟数自动循环发送 Webhook 催办，直到点击完成。",
             lbl_todo_webhook_override: "自定义待办专属 Webhook (覆盖全局)",
@@ -1632,10 +1679,10 @@
             login_hint: "Default password is admin. Change it after login.",
             card_accounts: "Telegram Accounts",
             btn_add_account: "Link Account",
-            acc_status_online: "🟢 Online",
-            acc_status_connecting: "🟡 Reconnecting",
-            acc_status_logging: "🟡 Logging in",
-            acc_status_offline: "🔴 Offline",
+            acc_status_online: "Online",
+            acc_status_connecting: "Reconnecting",
+            acc_status_logging: "Logging in",
+            acc_status_offline: "Offline",
             card_webhook: "Global Webhook Config",
             card_offline_webhook: "Account Offline Webhook",
             offline_webhook_hint: "Sent when an account goes offline or session expires (Uses Global Webhook if empty).",
@@ -1660,8 +1707,8 @@
             rule_disabled: "Paused",
             btn_edit: "Edit",
             btn_delete: "Delete",
-            rule_filter_all: "📢 Listen All",
-            rule_filter_kw: "🔍 Keywords",
+            rule_filter_all: "Listen All",
+            rule_filter_kw: "Keywords",
             rule_regex_active: "Regex Mode",
             rule_override_webhook: "Dedicated Webhook",
             // Login Modal
@@ -1700,8 +1747,8 @@
             btn_confirm_pwd: "Change Password",
             // Diagnostic Modal
             modal_test_title: "Webhook Connection Diagnostics",
-            test_success: "🚀 Test Request Completed",
-            test_failed: "❌ Request Failed",
+            test_success: "Test Request Completed",
+            test_failed: "Request Failed",
             lbl_http_code: "HTTP Status Code",
             lbl_response_body: "Downstream Response Payload (First 1000 chars):",
             lbl_error_stack: "Error Exception Stack / Reasons:",
@@ -1737,15 +1784,15 @@
             filter_completed: "Completed",
             no_todos_title: "No Scheduled Todos",
             no_todos_desc: "Click 'New Todo Reminder' above to set reminders with date calculation, recurring schedules, and Webhooks.",
-            todo_status_pending: "⏳ Pending",
-            todo_status_confirming: "🚨 Pending Confirm",
-            todo_status_completed: "✅ Completed",
-            todo_status_disabled: "⏸️ Paused",
-            todo_status_overdue: "⚠️ Due / Overdue",
-            todo_tag_once: "⚡ Once",
-            todo_tag_recurring: "🔁 Recurring",
-            todo_tag_auto_confirm: "🤖 Auto Confirm",
-            todo_tag_manual_confirm: "👆 Manual Confirm",
+            todo_status_pending: "Pending",
+            todo_status_confirming: "Pending Confirm",
+            todo_status_completed: "Completed",
+            todo_status_disabled: "Paused",
+            todo_status_overdue: "Due / Overdue",
+            todo_tag_once: "Once",
+            todo_tag_recurring: "Recurring",
+            todo_tag_auto_confirm: "Auto Confirm",
+            todo_tag_manual_confirm: "Manual Confirm",
             lbl_target_time: "Target Time",
             lbl_remaining_time: "Remaining Time",
             lbl_created_at: "Created",
@@ -1761,15 +1808,15 @@
             lbl_todo_content: "Details & Notes (Optional)",
             ph_todo_content: "Enter description, memo, or instructions...",
             lbl_date_mode: "Date Input Mode",
-            mode_offset_days: "📅 Offset Days (Smart Calculation)",
-            mode_exact_datetime: "⏰ Exact Date & Time",
+            mode_offset_days: "Offset Days (Smart Calculation)",
+            mode_exact_datetime: "Exact Date & Time",
             lbl_offset_days: "Days from now",
             lbl_offset_time: "Time of day",
-            lbl_calc_target: "💡 Calculated Target Time:",
+            lbl_calc_target: "Calculated Target Time:",
             lbl_exact_datetime: "Exact Date & Time",
             lbl_exec_mode: "Execution Mode",
-            mode_once: "⚡ Once (Complete when due)",
-            mode_recurring: "🔁 Recurring (Repeats by interval)",
+            mode_once: "Once (Complete when due)",
+            mode_recurring: "Recurring (Repeats by interval)",
             lbl_repeat_interval: "Repeat Interval",
             unit_minutes: "Minutes",
             unit_hours: "Hours",
@@ -1777,8 +1824,8 @@
             unit_weeks: "Weeks",
             unit_months: "Months",
             lbl_confirm_mode: "Confirmation Mode",
-            mode_auto_confirm: "🤖 Auto Confirm (Triggers Webhook once & marks done/next)",
-            mode_manual_confirm: "👆 Manual Confirm (Requires manual complete click; retries until confirmed)",
+            mode_auto_confirm: "Auto Confirm (Triggers Webhook once & marks done/next)",
+            mode_manual_confirm: "Manual Confirm (Requires manual complete click; retries until confirmed)",
             lbl_remind_interval: "Unconfirmed Retry Interval (Mins)",
             remind_interval_hint: "If not confirmed after due time, Webhook will be sent repeatedly every N minutes until confirmed.",
             lbl_todo_webhook_override: "Dedicated Webhook for this Todo",
@@ -1800,8 +1847,6 @@
             status_updating_desc: "Triggered update command. Container is pulling latest Docker image and recreating. Reconnecting automatically...",
             lbl_update_log: "New Release Commit Log",
             lbl_update_tip_title: "Active Update Notice",
-            lbl_update_tip_desc: "Clicking 'Start Update' triggers image pulling and container recreation. Takes approx 10-30s; sessions and configs are preserved.",
-            msg_already_latest: "You are running the latest version!",
             lbl_last_checked: "Last Checked",
             btn_recheck_update: "Check Again",
             btn_start_update: "Start Update Now"
@@ -2896,7 +2941,7 @@
                 clearInterval(interval);
                 this.updatingSystem = false;
                 this.showUpdateModal = false;
-                this.showToast(this.lang === 'zh' ? "🎉 系统已更新完毕并恢复运行！" : "🎉 System updated successfully!");
+                this.showToast(this.lang === 'zh' ? "系统已更新完毕并恢复运行！" : "System updated successfully!");
                 setTimeout(() => {
                   window.location.reload();
                 }, 1000);
