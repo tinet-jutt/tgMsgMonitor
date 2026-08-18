@@ -1674,7 +1674,8 @@ async def trigger_test_todo(todo_id: str):
 
 # ----------------- 系统版本与在线更新检测/触发 API -----------------
 
-APP_VERSION = os.getenv("APP_VERSION", "v1.2.0")
+_raw_ver = os.getenv("APP_VERSION", "v1.2.0")
+APP_VERSION = "v1.2.0" if _raw_ver in ("main", "dev", "") else _raw_ver
 APP_COMMIT_SHA = os.getenv("APP_COMMIT_SHA", "")
 
 def get_current_version_info() -> Dict[str, str]:
@@ -1689,7 +1690,7 @@ def get_current_version_info() -> Dict[str, str]:
         except Exception:
             pass
     if not sha:
-        sha = "7b0dbd6"
+        sha = "12363f1"
     return {
         "version": APP_VERSION,
         "commit_sha": sha,
