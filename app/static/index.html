@@ -637,28 +637,35 @@
         <!-- 右栏：待办任务列表 (2/3 宽度) -->
         <div class="lg:col-span-2 space-y-6">
           <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center space-x-2">
-              <i data-lucide="calendar-check" class="w-5 h-5 text-indigo-400"></i>
-              <h2 class="text-lg font-bold text-white" x-text="t('card_todos')"></h2>
-            </div>
-            <p class="text-xs text-gray-400 mt-1" x-text="t('todo_desc')"></p>
-          </div>
-
-          <div class="flex items-center space-x-3">
-            <!-- 状态筛选按纽组 -->
-            <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
-              <button type="button" @click="todoFilter = 'all'" :class="todoFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_all')"></button>
-              <button type="button" @click="todoFilter = 'pending'" :class="todoFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_pending')"></button>
-              <button type="button" @click="todoFilter = 'pending_confirm'" :class="todoFilter === 'pending_confirm' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_confirming')"></button>
-              <button type="button" @click="todoFilter = 'completed'" :class="todoFilter === 'completed' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_completed')"></button>
+        <div class="space-y-4">
+          <!-- 头部标题与新建按钮 -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center space-x-2">
+                <i data-lucide="calendar-check" class="w-5 h-5 text-indigo-400"></i>
+                <h2 class="text-lg font-bold text-white" x-text="t('card_todos')"></h2>
+              </div>
+              <p class="text-xs text-gray-400 mt-1" x-text="t('todo_desc')"></p>
             </div>
 
-            <button type="button" @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0">
+            <button type="button" @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0 whitespace-nowrap self-start sm:self-auto">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span x-text="t('btn_new_todo')"></span>
             </button>
+          </div>
+
+          <!-- 状态筛选标签栏 (横向滚动保护与防止换行挤压) -->
+          <div class="flex items-center justify-between gap-3 pt-2 border-t border-brand-border/40">
+            <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs shrink-0 overflow-x-auto max-w-full">
+              <button type="button" @click="todoFilter = 'all'" :class="todoFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap" x-text="t('filter_all')"></button>
+              <button type="button" @click="todoFilter = 'pending'" :class="todoFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap" x-text="t('filter_pending')"></button>
+              <button type="button" @click="todoFilter = 'pending_confirm'" :class="todoFilter === 'pending_confirm' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap" x-text="t('filter_confirming')"></button>
+              <button type="button" @click="todoFilter = 'completed'" :class="todoFilter === 'completed' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap" x-text="t('filter_completed')"></button>
+            </div>
+            
+            <div class="text-xs text-gray-500 hidden md:block whitespace-nowrap">
+              <span x-text="lang === 'zh' ? `共 ${filteredTodos.length} 项任务` : `${filteredTodos.length} todos`"></span>
+            </div>
           </div>
         </div>
 
