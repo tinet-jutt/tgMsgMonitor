@@ -63,7 +63,7 @@
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_admin_pwd')"></label>
           <input type="password" x-model="adminPasswordInput" @keydown.enter="loginAdmin()" :placeholder="t('ph_admin_pwd')" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition text-center tracking-widest">
         </div>
-        <button @click="loginAdmin()" :disabled="loggingIn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+        <button type="button" @click="loginAdmin()" :disabled="loggingIn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
           <i data-lucide="key-round" class="w-4 h-4" x-show="!loggingIn"></i>
           <span x-show="!loggingIn" x-text="t('btn_login')"></span>
           <span x-show="loggingIn" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -91,13 +91,13 @@
 
         <!-- 核心 Tab 切换栏 -->
         <nav class="hidden md:flex items-center space-x-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
-          <button @click="currentTab = 'tg_monitor'" 
+          <button type="button" @click="currentTab = 'tg_monitor'" 
                   :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-brand-card'"
                   class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-2">
             <i data-lucide="radio" class="w-4 h-4"></i>
             <span x-text="t('tab_tg_monitor')"></span>
           </button>
-          <button @click="currentTab = 'scheduled_todos'" 
+          <button type="button" @click="currentTab = 'scheduled_todos'" 
                   :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-brand-card'"
                   class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-2 relative">
             <i data-lucide="calendar-clock" class="w-4 h-4"></i>
@@ -112,10 +112,10 @@
       <div class="flex items-center space-x-4">
         <!-- 移动端 Tab 切换 -->
         <div class="flex md:hidden items-center space-x-1 bg-brand-dark p-1 rounded-lg border border-brand-border">
-          <button @click="currentTab = 'tg_monitor'" :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs">
+          <button type="button" @click="currentTab = 'tg_monitor'" :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs">
             <i data-lucide="radio" class="w-4 h-4"></i>
           </button>
-          <button @click="currentTab = 'scheduled_todos'" :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs relative">
+          <button type="button" @click="currentTab = 'scheduled_todos'" :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs relative">
             <i data-lucide="calendar-clock" class="w-4 h-4"></i>
             <template x-if="pendingConfirmCount > 0">
               <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
@@ -128,7 +128,7 @@
           <span x-text="t('sys_online')"></span>
         </span>
         <!-- 版本与检查更新按钮 -->
-        <button @click="checkSystemUpdate(true)" 
+        <button type="button" @click="checkSystemUpdate(true)" 
                 class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 relative border"
                 :class="hasNewUpdate ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-sm' : 'bg-brand-border/40 border-transparent hover:bg-brand-border hover:text-white text-gray-300'"
                 :title="t('btn_check_update')">
@@ -139,16 +139,16 @@
           </template>
         </button>
         <!-- 语言切换按钮 -->
-        <button @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" title="Switch Language">
+        <button type="button" @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" title="Switch Language">
           <i data-lucide="globe" class="w-3.5 h-3.5"></i>
           <span x-text="lang === 'zh' ? 'English' : '简体中文'"></span>
         </button>
         <!-- 安全密码修改按钮 -->
-        <button @click="showPwdModal = true" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" :title="t('btn_pwd')">
+        <button type="button" @click="showPwdModal = true" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" :title="t('btn_pwd')">
           <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
           <span x-text="t('btn_pwd')"></span>
         </button>
-        <button @click="refreshData()" :disabled="refreshing" class="p-2 text-gray-400 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition disabled:opacity-50 flex items-center justify-center" :title="t('btn_refresh')">
+        <button type="button" @click="refreshData()" :disabled="refreshing" class="p-2 text-gray-400 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition disabled:opacity-50 flex items-center justify-center" :title="t('btn_refresh')">
           <span :class="refreshing ? 'animate-spin block' : 'block'">
             <i data-lucide="rotate-cw" class="w-5 h-5"></i>
           </span>
@@ -171,7 +171,7 @@
               <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_accounts')"></h2>
             </div>
-            <button @click="openLoginModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/10 flex items-center space-x-1">
+            <button type="button" @click="openLoginModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/10 flex items-center space-x-1">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               <span x-text="t('btn_add_account')"></span>
             </button>
@@ -207,13 +207,13 @@
                 <div class="flex items-center space-x-2">
                   <!-- 删除账号确认 -->
                   <div x-data="{ confirmDelete: false }" class="relative">
-                    <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition">
+                    <button type="button" x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition">
                       <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                     <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-1.5 py-0.5 text-[10px]">
                       <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
-                      <button @click="deleteAccount(acc.phone)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
-                      <button @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                      <button type="button" @click="deleteAccount(acc.phone)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                      <button type="button" @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
                     </div>
                   </div>
                 </div>
@@ -230,7 +230,7 @@
               <h2 class="text-md font-bold text-white" x-text="t('card_webhook')"></h2>
             </div>
             <!-- 帮助问号说明链接按钮 -->
-            <button @click="showHelpModal = true" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+            <button type="button" @click="showHelpModal = true" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
               <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
             </button>
@@ -258,12 +258,12 @@
               <input type="number" x-model.number="globalWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition">
             </div>
             <div class="grid grid-cols-2 gap-4">
-              <button @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+              <button type="button" @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
                 <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingWebhook"></i>
                 <span x-show="!testingWebhook" x-text="t('btn_test_conn')"></span>
                 <span x-show="testingWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
-              <button @click="saveGlobalWebhook()" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
+              <button type="button" @click="saveGlobalWebhook()" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
                 <i data-lucide="save" class="w-4 h-4"></i>
                 <span x-text="t('btn_save_config')"></span>
               </button>
@@ -278,7 +278,7 @@
               <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_offline_webhook')"></h2>
             </div>
-            <button @click="showHelpModal = true" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-amber-600/20 text-amber-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+            <button type="button" @click="showHelpModal = true" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-amber-600/20 text-amber-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
               <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
             </button>
@@ -288,16 +288,16 @@
           <div class="bg-brand-dark/40 border border-brand-border/60 rounded-lg p-2 text-xs">
             <span class="text-gray-400 font-medium mr-1.5" x-text="lang === 'zh' ? '支持下线账号占位符 (点击复制):' : 'Offline Placeholders (Click to copy):'"></span>
             <div class="inline-flex flex-wrap gap-1.5 mt-1">
-              <button @click="copyPlaceholder('{phone}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线账号手机号' : 'Offline account phone'">
+              <button type="button" @click="copyPlaceholder('{phone}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线账号手机号' : 'Offline account phone'">
                 {phone}
               </button>
-              <button @click="copyPlaceholder('{reason}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线/失效原因' : 'Offline reason'">
+              <button type="button" @click="copyPlaceholder('{reason}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线/失效原因' : 'Offline reason'">
                 {reason}
               </button>
-              <button @click="copyPlaceholder('{date}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线事件发生时间' : 'Offline datetime'">
+              <button type="button" @click="copyPlaceholder('{date}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '下线事件发生时间' : 'Offline datetime'">
                 {date}
               </button>
-              <button @click="copyPlaceholder('{text}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '默认整段下线告警文本' : 'Default offline alert text'">
+              <button type="button" @click="copyPlaceholder('{text}')" class="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[11px] font-mono transition" :title="lang === 'zh' ? '默认整段下线告警文本' : 'Default offline alert text'">
                 {text}
               </button>
             </div>
@@ -321,12 +321,12 @@
               <textarea x-model="offlineWebhook.custom_body" rows="3" placeholder='{"event": "account_offline", "phone": "{phone}", "reason": "{reason}", "date": "{date}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
             </div>
             <div class="grid grid-cols-2 gap-4">
-              <button @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+              <button type="button" @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
                 <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineWebhook"></i>
                 <span x-show="!testingOfflineWebhook" x-text="t('btn_test_conn')"></span>
                 <span x-show="testingOfflineWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
-              <button @click="saveOfflineWebhook()" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
+              <button type="button" @click="saveOfflineWebhook()" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
                 <i data-lucide="save" class="w-4 h-4"></i>
                 <span x-text="t('btn_save_config')"></span>
               </button>
@@ -343,7 +343,7 @@
               <i data-lucide="shield-alert" class="w-5 h-5 text-indigo-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_rules')"></h2>
             </div>
-            <button @click="openRuleModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/20 flex items-center space-x-1.5">
+            <button type="button" @click="openRuleModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/20 flex items-center space-x-1.5">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span x-text="t('btn_new_rule')"></span>
             </button>
@@ -384,7 +384,7 @@
                   
                   <div class="flex items-center space-x-3">
                     <!-- Toggle 开关 -->
-                    <button @click="toggleRule(rule.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                    <button type="button" @click="toggleRule(rule.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
                             :class="rule.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                       <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                            :class="rule.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -392,19 +392,19 @@
 
                     <!-- 删除与编辑 -->
                     <div class="flex items-center space-x-1.5 border-l border-brand-border pl-3">
-                      <button @click="openRuleModal(rule)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
+                      <button type="button" @click="openRuleModal(rule)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
                         <i data-lucide="pencil" class="w-4 h-4"></i>
                       </button>
                       
                       <!-- 删除确认 -->
                       <div x-data="{ confirmDelete: false }" class="relative">
-                        <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
+                        <button type="button" x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
                           <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                         <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-2 py-1 text-xs">
                           <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
-                          <button @click="deleteRule(rule.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
-                          <button @click="confirmDelete = false" class="text-gray-400 hover:underline" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                          <button type="button" @click="deleteRule(rule.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                          <button type="button" @click="confirmDelete = false" class="text-gray-400 hover:underline" x-text="lang === 'zh' ? '否' : 'No'"></button>
                         </div>
                       </div>
                     </div>
@@ -571,13 +571,13 @@
           <div class="flex items-center space-x-3">
             <!-- 状态筛选按纽组 -->
             <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
-              <button @click="todoFilter = 'all'" :class="todoFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_all')"></button>
-              <button @click="todoFilter = 'pending'" :class="todoFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_pending')"></button>
-              <button @click="todoFilter = 'pending_confirm'" :class="todoFilter === 'pending_confirm' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_confirming')"></button>
-              <button @click="todoFilter = 'completed'" :class="todoFilter === 'completed' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_completed')"></button>
+              <button type="button" @click="todoFilter = 'all'" :class="todoFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_all')"></button>
+              <button type="button" @click="todoFilter = 'pending'" :class="todoFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_pending')"></button>
+              <button type="button" @click="todoFilter = 'pending_confirm'" :class="todoFilter === 'pending_confirm' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_confirming')"></button>
+              <button type="button" @click="todoFilter = 'completed'" :class="todoFilter === 'completed' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_completed')"></button>
             </div>
 
-            <button @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0">
+            <button type="button" @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span x-text="t('btn_new_todo')"></span>
             </button>
@@ -593,7 +593,7 @@
               </div>
               <h3 class="text-sm font-semibold text-gray-300" x-text="t('no_todos_title')"></h3>
               <p class="text-xs text-gray-500 mt-1 max-w-md mx-auto" x-text="t('no_todos_desc')"></p>
-              <button @click="openTodoModal()" class="mt-4 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition inline-flex items-center space-x-1.5">
+              <button type="button" @click="openTodoModal()" class="mt-4 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition inline-flex items-center space-x-1.5">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 <span x-text="t('btn_new_todo')"></span>
               </button>
@@ -663,7 +663,7 @@
                 <div class="flex items-center space-x-2.5">
                   <!-- 手动确认完成按钮 (仅在待确认状态或未完成时突出展示) -->
                   <template x-if="todo.status === 'pending_confirm'">
-                    <button @click="completeTodo(todo.id)" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30 active:scale-95">
+                    <button type="button" @click="completeTodo(todo.id)" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30 active:scale-95">
                       <i data-lucide="check" class="w-4 h-4"></i>
                       <span x-text="t('btn_complete_todo')"></span>
                     </button>
@@ -671,38 +671,38 @@
 
                   <!-- 已完成任务重置激活按纽 -->
                   <template x-if="todo.status === 'completed'">
-                    <button @click="openResetTodoModal(todo)" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-indigo-400 hover:text-white rounded-lg text-xs font-medium transition flex items-center space-x-1.5" :title="t('btn_reactivate_todo')">
+                    <button type="button" @click="openResetTodoModal(todo)" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-indigo-400 hover:text-white rounded-lg text-xs font-medium transition flex items-center space-x-1.5" :title="t('btn_reactivate_todo')">
                       <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                       <span x-text="t('btn_reactivate_todo')"></span>
                     </button>
                   </template>
 
                   <!-- 启用/暂停 Toggle -->
-                  <button @click="toggleTodo(todo.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                  <button type="button" @click="toggleTodo(todo.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
                           :class="todo.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'" :title="todo.is_enabled ? t('rule_enabled') : t('rule_disabled')">
                     <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                          :class="todo.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
                   </button>
 
                   <!-- 测试触发 Webhook 按钮 -->
-                  <button @click="triggerTestTodo(todo.id)" class="p-1.5 text-gray-400 hover:text-indigo-300 rounded-md hover:bg-indigo-600/10 transition" :title="t('btn_test_todo')">
+                  <button type="button" @click="triggerTestTodo(todo.id)" class="p-1.5 text-gray-400 hover:text-indigo-300 rounded-md hover:bg-indigo-600/10 transition" :title="t('btn_test_todo')">
                     <i data-lucide="play" class="w-4 h-4"></i>
                   </button>
 
                   <!-- 编辑按钮 -->
-                  <button @click="openTodoModal(todo)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
+                  <button type="button" @click="openTodoModal(todo)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
                     <i data-lucide="pencil" class="w-4 h-4"></i>
                   </button>
 
                   <!-- 删除确认按钮 -->
                   <div x-data="{ confirmDelete: false }" class="relative">
-                    <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
+                    <button type="button" x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
                       <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                     <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-2 py-1 text-xs">
                       <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
-                      <button @click="deleteTodo(todo.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
-                      <button @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                      <button type="button" @click="deleteTodo(todo.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                      <button type="button" @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
                     </div>
                   </div>
                 </div>
@@ -758,7 +758,7 @@
   <!-- 模态框 1：Telegram 账号登录 -->
   <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeLoginModal()">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
-      <button @click="closeLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="closeLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
@@ -790,7 +790,7 @@
               <input type="text" x-model="loginForm.api_hash" placeholder="your_hash" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
             </div>
           </div>
-          <button @click="sendCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+          <button type="button" @click="sendCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
             <span x-show="!submittingLogin" x-text="t('btn_get_code')"></span>
             <span x-show="submittingLogin" class="flex items-center space-x-2">
               <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -809,14 +809,14 @@
             <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_sms_code')"></label>
             <input type="text" x-model="loginForm.code" :placeholder="lang === 'zh' ? '输入验证码' : 'Enter SMS Code'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white tracking-widest text-center font-bold">
           </div>
-          <button @click="verifyCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+          <button type="button" @click="verifyCode()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
             <span x-show="!submittingLogin" x-text="t('btn_verify_code')"></span>
             <span x-show="submittingLogin" class="flex items-center space-x-2">
               <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               <span x-text="lang === 'zh' ? '验证中...' : 'Verifying...'"></span>
             </span>
           </button>
-          <button @click="loginStep = 1; loginError = ''" class="w-full py-2 bg-transparent text-gray-400 hover:text-white rounded-lg text-xs transition" x-text="lang === 'zh' ? '返回上一步' : 'Go Back'"></button>
+          <button type="button" @click="loginStep = 1; loginError = ''" class="w-full py-2 bg-transparent text-gray-400 hover:text-white rounded-lg text-xs transition" x-text="lang === 'zh' ? '返回上一步' : 'Go Back'"></button>
         </div>
 
         <!-- 阶段三：输入两步验证密码 -->
@@ -829,7 +829,7 @@
             <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_2fa_pwd')"></label>
             <input type="password" x-model="loginForm.password" :placeholder="lang === 'zh' ? '输入密码' : 'Enter 2FA Password'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
           </div>
-          <button @click="verify2FA()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
+          <button type="button" @click="verify2FA()" :disabled="submittingLogin" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition font-semibold text-sm flex items-center justify-center space-x-2">
             <span x-show="!submittingLogin" x-text="t('btn_verify_2fa')"></span>
             <span x-show="submittingLogin" class="flex items-center space-x-2">
               <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -845,7 +845,7 @@
   <!-- 模态框 2：规则添加/编辑 -->
   <div x-show="showRuleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeRuleModal()">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-      <button @click="closeRuleModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="closeRuleModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
@@ -916,7 +916,7 @@
               <template x-for="(tag, index) in ruleForm.keywords" :key="index">
                 <span class="inline-flex items-center px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded text-xs font-medium">
                   <span x-text="tag"></span>
-                  <button @click="ruleForm.keywords.splice(index, 1)" class="ml-1 text-indigo-400 hover:text-indigo-200 focus:outline-none">
+                  <button type="button" @click="ruleForm.keywords.splice(index, 1)" class="ml-1 text-indigo-400 hover:text-indigo-200 focus:outline-none">
                     <i data-lucide="x" class="w-3 h-3"></i>
                   </button>
                 </span>
@@ -932,7 +932,7 @@
               <template x-for="(tag, index) in ruleForm.exclude_keywords" :key="index">
                 <span class="inline-flex items-center px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-xs font-medium line-through">
                   <span x-text="tag"></span>
-                  <button @click="ruleForm.exclude_keywords.splice(index, 1)" class="ml-1 text-red-400 hover:text-red-200 focus:outline-none">
+                  <button type="button" @click="ruleForm.exclude_keywords.splice(index, 1)" class="ml-1 text-red-400 hover:text-red-200 focus:outline-none">
                     <i data-lucide="x" class="w-3 h-3"></i>
                   </button>
                 </span>
@@ -948,7 +948,7 @@
               <template x-for="(tag, index) in ruleForm.exclude_senders" :key="index">
                 <span class="inline-flex items-center px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-xs font-medium line-through">
                   <span x-text="tag.startsWith('@') || /^\d+$/.test(tag) ? tag : '@' + tag"></span>
-                  <button @click="ruleForm.exclude_senders.splice(index, 1)" class="ml-1 text-amber-400 hover:text-amber-200 focus:outline-none">
+                  <button type="button" @click="ruleForm.exclude_senders.splice(index, 1)" class="ml-1 text-amber-400 hover:text-amber-200 focus:outline-none">
                     <i data-lucide="x" class="w-3 h-3"></i>
                   </button>
                 </span>
@@ -963,7 +963,7 @@
               <span class="text-xs font-semibold text-gray-300 block" x-text="t('lbl_regex_enable')"></span>
               <span class="text-[10px] text-gray-500" x-text="t('regex_hint')"></span>
             </div>
-            <button @click="ruleForm.use_regex = !ruleForm.use_regex" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+            <button type="button" @click="ruleForm.use_regex = !ruleForm.use_regex" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
                     :class="ruleForm.use_regex ? 'bg-indigo-600' : 'bg-gray-700'">
               <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                    :class="ruleForm.use_regex ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -1000,12 +1000,12 @@
             <div class="flex items-center space-x-2 flex-wrap">
               <span class="text-xs font-semibold text-gray-300 block" x-text="t('lbl_override_webhook')"></span>
               <span class="text-[10px] text-gray-500 mr-2" x-text="t('override_hint')"></span>
-              <button @click="showHelpModal = true" class="px-1.5 py-0.5 text-[10px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+              <button type="button" @click="showHelpModal = true" class="px-1.5 py-0.5 text-[10px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
                 <i data-lucide="help-circle" class="w-3 h-3"></i>
                 <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
               </button>
             </div>
-            <button @click="ruleForm.overrideWebhook = !ruleForm.overrideWebhook" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+            <button type="button" @click="ruleForm.overrideWebhook = !ruleForm.overrideWebhook" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
                     :class="ruleForm.overrideWebhook ? 'bg-indigo-600' : 'bg-gray-700'">
               <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                    :class="ruleForm.overrideWebhook ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -1030,7 +1030,7 @@
             </div>
             <!-- 测试此专属按钮 -->
             <div class="flex justify-end pt-1">
-              <button @click="testWebhook('rule')" :disabled="testingWebhook" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg transition text-xs flex items-center space-x-1.5 disabled:opacity-50 shadow-sm">
+              <button type="button" @click="testWebhook('rule')" :disabled="testingWebhook" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg transition text-xs flex items-center space-x-1.5 disabled:opacity-50 shadow-sm">
                 <i data-lucide="play" class="w-3.5 h-3.5 text-indigo-400" x-show="!testingWebhook"></i>
                 <span x-show="!testingWebhook" x-text="t('btn_test_dedicated')"></span>
                 <span x-show="testingWebhook" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -1041,8 +1041,8 @@
 
         <!-- 提交动作栏 -->
         <div class="flex items-center justify-end space-x-3 border-t border-brand-border pt-4">
-          <button @click="closeRuleModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white bg-transparent hover:bg-brand-border rounded-lg transition">取消</button>
-          <button @click="saveRule()" class="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition flex items-center space-x-2">
+          <button type="button" @click="closeRuleModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white bg-transparent hover:bg-brand-border rounded-lg transition">取消</button>
+          <button type="button" @click="saveRule()" class="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition flex items-center space-x-2">
             <i data-lucide="check" class="w-4 h-4"></i>
             <span>保存规则</span>
           </button>
@@ -1054,7 +1054,7 @@
   <!-- 占位符帮助说明弹窗 -->
   <div x-show="showHelpModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showHelpModal = false">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
-      <button @click="showHelpModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="showHelpModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
@@ -1137,7 +1137,7 @@
         </table>
       </div>
       <div class="mt-4 flex justify-end">
-        <button @click="showHelpModal = false" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭帮助' : 'Close'"></button>
+        <button type="button" @click="showHelpModal = false" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭帮助' : 'Close'"></button>
       </div>
     </div>
   </div>
@@ -1145,7 +1145,7 @@
   <!-- Webhook 测试结果诊断弹窗 -->
   <div x-show="showTestResultModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showTestResultModal = false">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
-      <button @click="showTestResultModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="showTestResultModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
@@ -1179,7 +1179,7 @@
         </div>
       </div>
       <div class="mt-6 flex justify-end">
-        <button @click="showTestResultModal = false" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭窗口' : 'Close'"></button>
+        <button type="button" @click="showTestResultModal = false" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭窗口' : 'Close'"></button>
       </div>
     </div>
   </div>
@@ -1187,7 +1187,7 @@
   <!-- 修改管理员密码模态框 -->
   <div x-show="showPwdModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showPwdModal = false">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
-      <button @click="showPwdModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="showPwdModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
@@ -1203,7 +1203,7 @@
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_new_pwd')"></label>
           <input type="password" x-model="pwdForm.new_password" :placeholder="lang === 'zh' ? '请输入新密码...' : 'Enter new password...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
         </div>
-        <button @click="changeAdminPassword()" :disabled="changingPwd" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+        <button type="button" @click="changeAdminPassword()" :disabled="changingPwd" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
           <i data-lucide="check" class="w-4 h-4" x-show="!changingPwd"></i>
           <span x-show="!changingPwd" x-text="t('btn_confirm_pwd')"></span>
           <span x-show="changingPwd" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -1215,7 +1215,7 @@
   <!-- 模态框：新建 / 编辑 定时待办提醒 -->
   <div x-show="showTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeTodoModal()">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-xl p-6 shadow-2xl relative my-8" @click.stop>
-      <button @click="closeTodoModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="closeTodoModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
@@ -1427,8 +1427,8 @@
 
       <!-- 底部按纽 -->
       <div class="mt-6 flex items-center justify-end space-x-3 pt-3 border-t border-brand-border">
-        <button @click="closeTodoModal()" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition" x-text="t('btn_cancel')"></button>
-        <button @click="saveTodo()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5">
+        <button type="button" @click="closeTodoModal()" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition" x-text="t('btn_cancel')"></button>
+        <button type="button" @click="saveTodo()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span x-text="t('btn_save_todo')"></span>
         </button>
@@ -1439,7 +1439,7 @@
   <!-- 模态框：重置并重新激活待办 -->
   <div x-show="showResetTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showResetTodoModal = false">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
-      <button @click="showResetTodoModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+      <button type="button" @click="showResetTodoModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <h3 class="text-md font-bold text-white mb-2 flex items-center space-x-2">
@@ -1453,7 +1453,7 @@
           <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2" x-text="t('lbl_reset_target')"></label>
           <input type="datetime-local" x-model="resetTargetDate" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
         </div>
-        <button @click="confirmResetTodo()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition font-semibold text-sm flex items-center justify-center space-x-2 shadow-sm">
+        <button type="button" @click="confirmResetTodo()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition font-semibold text-sm flex items-center justify-center space-x-2 shadow-sm">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span x-text="t('btn_confirm_reset')"></span>
         </button>
