@@ -78,16 +78,51 @@
   <!-- 页面顶部导航栏 -->
   <header class="border-b border-brand-border bg-brand-card/80 backdrop-blur-md sticky top-0 z-40" x-show="isLoggedIn" x-cloak>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg">
-          <i data-lucide="eye" class="w-6 h-6"></i>
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg">
+            <i data-lucide="eye" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-white tracking-wide" x-text="t('app_title')"></h1>
+            <p class="text-xs text-gray-400" x-text="t('app_subtitle')"></p>
+          </div>
         </div>
-        <div>
-          <h1 class="text-lg font-bold text-white tracking-wide" x-text="t('app_title')"></h1>
-          <p class="text-xs text-gray-400" x-text="t('app_subtitle')"></p>
-        </div>
+
+        <!-- 核心 Tab 切换栏 -->
+        <nav class="hidden md:flex items-center space-x-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
+          <button @click="currentTab = 'tg_monitor'" 
+                  :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-brand-card'"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-2">
+            <i data-lucide="radio" class="w-4 h-4"></i>
+            <span x-text="t('tab_tg_monitor')"></span>
+          </button>
+          <button @click="currentTab = 'scheduled_todos'" 
+                  :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-brand-card'"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-2 relative">
+            <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+            <span x-text="t('tab_scheduled_todos')"></span>
+            <template x-if="pendingConfirmCount > 0">
+              <span class="px-1.5 py-0.2 bg-red-500 text-white text-[10px] font-bold rounded-full animate-pulse" x-text="pendingConfirmCount"></span>
+            </template>
+          </button>
+        </nav>
       </div>
+
       <div class="flex items-center space-x-4">
+        <!-- 移动端 Tab 切换 -->
+        <div class="flex md:hidden items-center space-x-1 bg-brand-dark p-1 rounded-lg border border-brand-border">
+          <button @click="currentTab = 'tg_monitor'" :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs">
+            <i data-lucide="radio" class="w-4 h-4"></i>
+          </button>
+          <button @click="currentTab = 'scheduled_todos'" :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs relative">
+            <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+            <template x-if="pendingConfirmCount > 0">
+              <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+            </template>
+          </button>
+        </div>
+
         <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           <span x-text="t('sys_online')"></span>
@@ -113,7 +148,9 @@
 
   <!-- 主体区域 -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-show="isLoggedIn" x-cloak>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Tab 1: TG 消息监控面板 -->
+    <div x-show="currentTab === 'tg_monitor'" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       
       <!-- 左栏：账号管理 (1/3 宽度) -->
       <div class="lg:col-span-1 space-y-6">
@@ -438,6 +475,256 @@
       </div>
 
     </div>
+
+    <!-- Tab 2: 定时待办提醒面板 -->
+    <div x-show="currentTab === 'scheduled_todos'" class="space-y-6" x-cloak>
+      
+      <!-- 待办控制台顶部统计卡片 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 全部待办 -->
+        <div @click="todoFilter = 'all'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-indigo-500/50" :class="todoFilter === 'all' ? 'border-indigo-500 bg-indigo-500/5 ring-1 ring-indigo-500/30' : 'border-brand-border'">
+          <div class="flex items-center justify-between">
+            <div class="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400">
+              <i data-lucide="layers" class="w-5 h-5"></i>
+            </div>
+            <span class="text-2xl font-bold text-white font-mono" x-text="todos.length"></span>
+          </div>
+          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_all_todos')"></div>
+        </div>
+
+        <!-- 等待到期 -->
+        <div @click="todoFilter = 'pending'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-blue-500/50" :class="todoFilter === 'pending' ? 'border-blue-500 bg-blue-500/5 ring-1 ring-blue-500/30' : 'border-brand-border'">
+          <div class="flex items-center justify-between">
+            <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+            <span class="text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'pending' && t.is_enabled).length"></span>
+          </div>
+          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_pending_todos')"></div>
+        </div>
+
+        <!-- 待手动确认 (催办中) -->
+        <div @click="todoFilter = 'pending_confirm'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-amber-500/50 relative overflow-hidden" :class="todoFilter === 'pending_confirm' ? 'border-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30' : 'border-brand-border'">
+          <template x-if="pendingConfirmCount > 0">
+            <span class="absolute top-0 right-0 w-10 h-10 bg-amber-500/20 rounded-bl-full flex items-start justify-end p-1.5 text-amber-400">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            </span>
+          </template>
+          <div class="flex items-center justify-between">
+            <div class="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
+              <i data-lucide="bell-ring" class="w-5 h-5"></i>
+            </div>
+            <span class="text-2xl font-bold text-white font-mono" :class="pendingConfirmCount > 0 ? 'text-amber-400' : ''" x-text="pendingConfirmCount"></span>
+          </div>
+          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_confirming_todos')"></div>
+        </div>
+
+        <!-- 已完成 -->
+        <div @click="todoFilter = 'completed'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-emerald-500/50" :class="todoFilter === 'completed' ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'border-brand-border'">
+          <div class="flex items-center justify-between">
+            <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            </div>
+            <span class="text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'completed').length"></span>
+          </div>
+          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_completed_todos')"></div>
+        </div>
+      </div>
+
+      <!-- 操作与筛选栏 -->
+      <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <i data-lucide="calendar-check" class="w-5 h-5 text-indigo-400"></i>
+              <h2 class="text-lg font-bold text-white" x-text="t('card_todos')"></h2>
+            </div>
+            <p class="text-xs text-gray-400 mt-1" x-text="t('todo_desc')"></p>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <!-- 状态筛选按纽组 -->
+            <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
+              <button @click="todoFilter = 'all'" :class="todoFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_all')"></button>
+              <button @click="todoFilter = 'pending'" :class="todoFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_pending')"></button>
+              <button @click="todoFilter = 'pending_confirm'" :class="todoFilter === 'pending_confirm' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_confirming')"></button>
+              <button @click="todoFilter = 'completed'" :class="todoFilter === 'completed' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="px-3 py-1.5 rounded-lg transition" x-text="t('filter_completed')"></button>
+            </div>
+
+            <button @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span x-text="t('btn_new_todo')"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 待办任务列表 -->
+        <div class="space-y-4">
+          <template x-if="filteredTodos.length === 0">
+            <div class="text-center py-16 border border-dashed border-brand-border rounded-2xl">
+              <div class="w-12 h-12 rounded-2xl bg-brand-dark/80 text-gray-500 flex items-center justify-center mx-auto mb-3 border border-brand-border">
+                <i data-lucide="calendar-x-2" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-sm font-semibold text-gray-300" x-text="t('no_todos_title')"></h3>
+              <p class="text-xs text-gray-500 mt-1 max-w-md mx-auto" x-text="t('no_todos_desc')"></p>
+              <button @click="openTodoModal()" class="mt-4 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition inline-flex items-center space-x-1.5">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span x-text="t('btn_new_todo')"></span>
+              </button>
+            </div>
+          </template>
+
+          <template x-for="todo in filteredTodos" :key="todo.id">
+            <div class="border rounded-2xl p-5 bg-brand-dark/30 transition-all space-y-4 relative"
+                 :class="!todo.is_enabled ? 'opacity-60 border-brand-border' : todo.status === 'pending_confirm' ? 'border-amber-500/60 bg-amber-500/5 ring-1 ring-amber-500/20' : todo.status === 'completed' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-brand-border hover:border-brand-border/90'">
+              
+              <!-- 顶部状态栏与标题 -->
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="space-y-1.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <!-- 状态徽章 -->
+                    <template x-if="!todo.is_enabled">
+                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20 font-medium flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span x-text="t('todo_status_disabled')"></span>
+                      </span>
+                    </template>
+                    <template x-if="todo.is_enabled && todo.status === 'completed'">
+                      <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span x-text="t('todo_status_completed')"></span>
+                      </span>
+                    </template>
+                    <template x-if="todo.is_enabled && todo.status === 'pending_confirm'">
+                      <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center space-x-1 animate-pulse">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        <span x-text="t('todo_status_confirming')"></span>
+                      </span>
+                    </template>
+                    <template x-if="todo.is_enabled && todo.status === 'pending' && todo.is_overdue">
+                      <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        <span x-text="t('todo_status_overdue')"></span>
+                      </span>
+                    </template>
+                    <template x-if="todo.is_enabled && todo.status === 'pending' && !todo.is_overdue">
+                      <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                        <span x-text="t('todo_status_pending')"></span>
+                      </span>
+                    </template>
+
+                    <!-- 执行模式徽章 -->
+                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium font-mono"
+                          :class="todo.is_recurring ? 'bg-purple-500/10 text-purple-300 border-purple-500/30' : 'bg-slate-500/10 text-slate-300 border-slate-500/30'"
+                          x-text="todo.is_recurring ? (lang === 'zh' ? `🔁 循环 (每 ${todo.repeat_interval_value} ${formatUnitText(todo.repeat_interval_unit)})` : `🔁 Recurring (${todo.repeat_interval_value} ${todo.repeat_interval_unit})`) : t('todo_tag_once')">
+                    </span>
+
+                    <!-- 确认方式徽章 -->
+                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-medium"
+                          :class="todo.confirm_type === 'manual' ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-teal-500/10 text-teal-300 border-teal-500/30'"
+                          x-text="todo.confirm_type === 'manual' ? (lang === 'zh' ? `👆 手动确认 (催办每 ${todo.remind_interval_minutes}m)` : `👆 Manual Confirm (${todo.remind_interval_minutes}m retry)`) : t('todo_tag_auto_confirm')">
+                    </span>
+
+                    <!-- 标题 -->
+                    <h3 class="text-base font-bold text-white ml-1" x-text="todo.title"></h3>
+                  </div>
+                </div>
+
+                <!-- 右侧操作栏 -->
+                <div class="flex items-center space-x-2.5">
+                  <!-- 手动确认完成按钮 (仅在待确认状态或未完成时突出展示) -->
+                  <template x-if="todo.status === 'pending_confirm'">
+                    <button @click="completeTodo(todo.id)" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30 active:scale-95">
+                      <i data-lucide="check" class="w-4 h-4"></i>
+                      <span x-text="t('btn_complete_todo')"></span>
+                    </button>
+                  </template>
+
+                  <!-- 已完成任务重置激活按纽 -->
+                  <template x-if="todo.status === 'completed'">
+                    <button @click="openResetTodoModal(todo)" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-indigo-400 hover:text-white rounded-lg text-xs font-medium transition flex items-center space-x-1.5" :title="t('btn_reactivate_todo')">
+                      <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                      <span x-text="t('btn_reactivate_todo')"></span>
+                    </button>
+                  </template>
+
+                  <!-- 启用/暂停 Toggle -->
+                  <button @click="toggleTodo(todo.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                          :class="todo.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'" :title="todo.is_enabled ? t('rule_enabled') : t('rule_disabled')">
+                    <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                         :class="todo.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+                  </button>
+
+                  <!-- 测试触发 Webhook 按钮 -->
+                  <button @click="triggerTestTodo(todo.id)" class="p-1.5 text-gray-400 hover:text-indigo-300 rounded-md hover:bg-indigo-600/10 transition" :title="t('btn_test_todo')">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                  </button>
+
+                  <!-- 编辑按钮 -->
+                  <button @click="openTodoModal(todo)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                  </button>
+
+                  <!-- 删除确认按钮 -->
+                  <div x-data="{ confirmDelete: false }" class="relative">
+                    <button x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-red-500/10 transition" :title="t('btn_delete')">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    <div x-show="confirmDelete" x-cloak class="flex items-center space-x-1 bg-brand-dark border border-red-500/30 rounded px-2 py-1 text-xs">
+                      <span class="text-red-400" x-text="lang === 'zh' ? '确定?' : 'Sure?'"></span>
+                      <button @click="deleteTodo(todo.id)" class="text-emerald-400 font-bold hover:underline" x-text="lang === 'zh' ? '是' : 'Yes'"></button>
+                      <button @click="confirmDelete = false" class="text-gray-400 hover:underline ml-1" x-text="lang === 'zh' ? '否' : 'No'"></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 时间详情与剩余倒计时卡片 -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-brand-dark/50 p-4 rounded-xl border border-brand-border/60">
+                <!-- 目标时间与倒计时 -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center space-x-2 text-gray-400">
+                    <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i>
+                    <span class="font-medium" x-text="t('lbl_target_time') + ':'"></span>
+                    <span class="text-white font-mono font-semibold" x-text="todo.target_date"></span>
+                  </div>
+                  <div class="flex items-center space-x-2 text-gray-400">
+                    <i data-lucide="hourglass" class="w-4 h-4 text-amber-400"></i>
+                    <span class="font-medium" x-text="t('lbl_remaining_time') + ':'"></span>
+                    <span class="font-semibold text-xs px-2 py-0.5 rounded-md"
+                          :class="todo.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : todo.status === 'pending_confirm' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : todo.is_overdue ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'"
+                          x-text="formatRemainingTime(todo)"></span>
+                  </div>
+                </div>
+
+                <!-- Webhook 与时间记录 -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center space-x-2 text-gray-400 truncate">
+                    <i data-lucide="link" class="w-4 h-4 text-indigo-400"></i>
+                    <span class="font-medium">Webhook:</span>
+                    <span class="px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold" x-text="todo.webhook && todo.webhook.url ? (todo.webhook.method || 'POST') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
+                    <span class="truncate text-indigo-300 font-mono" x-text="(todo.webhook && todo.webhook.url) ? todo.webhook.url : (globalWebhook.url || (lang === 'zh' ? '未配置全局 Webhook' : 'No Global Webhook'))"></span>
+                  </div>
+                  <div class="flex items-center space-x-4 text-gray-500 text-[11px]">
+                    <span x-show="todo.created_at" x-text="t('lbl_created_at') + ': ' + todo.created_at"></span>
+                    <span x-show="todo.last_trigger_time" x-text="t('lbl_last_trigger') + ': ' + todo.last_trigger_time"></span>
+                    <span x-show="todo.completed_at && todo.status === 'completed'" class="text-emerald-400" x-text="t('lbl_completed_at') + ': ' + todo.completed_at"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 待办内容详情 -->
+              <template x-if="todo.content && todo.content.trim()">
+                <div class="text-xs text-gray-300 bg-brand-dark/30 p-3 rounded-lg border border-brand-border/40 whitespace-pre-wrap font-sans leading-relaxed" x-text="todo.content"></div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+
   </main>
 
   <!-- 模态框 1：Telegram 账号登录 -->
@@ -894,6 +1181,228 @@
     </div>
   </div>
 
+  <!-- 模态框：新建 / 编辑 定时待办提醒 -->
+  <div x-show="showTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeTodoModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-xl p-6 shadow-2xl relative my-8" @click.stop>
+      <button @click="closeTodoModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white mb-1 flex items-center space-x-2">
+        <i data-lucide="calendar-clock" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="todoForm.isEdit ? t('modal_edit_todo_title') : t('modal_new_todo_title')"></span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-5" x-text="t('todo_desc')"></p>
+
+      <div class="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+        <!-- 待办标题 -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+            <span class="text-red-400 mr-1">*</span><span x-text="t('lbl_todo_title')"></span>
+          </label>
+          <input type="text" x-model="todoForm.title" :placeholder="t('ph_todo_title')" class="w-full px-3.5 py-2.5 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-xl text-sm text-white transition">
+        </div>
+
+        <!-- 待办内容说明 -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2" x-text="t('lbl_todo_content')"></label>
+          <textarea x-model="todoForm.content" rows="2" :placeholder="t('ph_todo_content')" class="w-full px-3.5 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-xl text-xs text-white transition font-sans"></textarea>
+        </div>
+
+        <!-- 日期设定模式选择 -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <label class="block text-xs font-semibold text-indigo-400 uppercase tracking-wider" x-text="t('lbl_date_mode')"></label>
+          
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.dateMode === 'offset_days' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" value="offset_days" x-model="todoForm.dateMode" class="text-indigo-600 focus:ring-0">
+              <span class="text-xs font-semibold" x-text="t('mode_offset_days')"></span>
+            </label>
+            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.dateMode === 'exact_datetime' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" value="exact_datetime" x-model="todoForm.dateMode" class="text-indigo-600 focus:ring-0">
+              <span class="text-xs font-semibold" x-text="t('mode_exact_datetime')"></span>
+            </label>
+          </div>
+
+          <!-- 模式 1：指定未来天数 -->
+          <div x-show="todoForm.dateMode === 'offset_days'" class="space-y-3 pt-2">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_offset_days')"></label>
+                <div class="relative">
+                  <input type="number" x-model.number="todoForm.offsetDays" min="1" max="3650" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+                  <span class="absolute right-3 top-2 text-xs text-gray-500" x-text="lang === 'zh' ? '天' : 'days'"></span>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_offset_time')"></label>
+                <input type="time" x-model="todoForm.offsetTime" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+              </div>
+            </div>
+
+            <!-- 快捷天数点击气泡 -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] text-gray-500 mr-1" x-text="lang === 'zh' ? '快捷推算:' : 'Quick:'"></span>
+              <button type="button" @click="todoForm.offsetDays = 1" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+1 天</button>
+              <button type="button" @click="todoForm.offsetDays = 3" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+3 天</button>
+              <button type="button" @click="todoForm.offsetDays = 7" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+7 天 (1周)</button>
+              <button type="button" @click="todoForm.offsetDays = 15" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+15 天 (半月)</button>
+              <button type="button" @click="todoForm.offsetDays = 30" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+30 天 (1月)</button>
+              <button type="button" @click="todoForm.offsetDays = 90" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+90 天 (1季)</button>
+              <button type="button" @click="todoForm.offsetDays = 365" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+365 天 (1年)</button>
+            </div>
+
+            <!-- 动态推算结果展示横幅 -->
+            <div class="p-2.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs flex items-center justify-between">
+              <span class="text-indigo-300 font-medium" x-text="t('lbl_calc_target')"></span>
+              <span class="text-white font-mono font-bold" x-text="computeOffsetTarget()"></span>
+            </div>
+          </div>
+
+          <!-- 模式 2：指定具体日期时间 -->
+          <div x-show="todoForm.dateMode === 'exact_datetime'" class="space-y-3 pt-2">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_exact_datetime')"></label>
+              <input type="datetime-local" x-model="todoForm.exactDateTime" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+            <!-- 快捷日期选择 -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] text-gray-500 mr-1" x-text="lang === 'zh' ? '快速设定:' : 'Quick:'"></span>
+              <button type="button" @click="setQuickExactDate(1)" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+1 天</button>
+              <button type="button" @click="setQuickExactDate(3)" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+3 天</button>
+              <button type="button" @click="setQuickExactDate(7)" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+7 天</button>
+              <button type="button" @click="setQuickExactDate(30)" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">+30 天</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 执行模式 (单次 vs 循环) -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <label class="block text-xs font-semibold text-purple-400 uppercase tracking-wider" x-text="t('lbl_exec_mode')"></label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="!todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" :value="false" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
+              <span class="text-xs font-semibold" x-text="t('mode_once')"></span>
+            </label>
+            <label class="flex items-center space-x-2 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" :value="true" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
+              <span class="text-xs font-semibold" x-text="t('mode_recurring')"></span>
+            </label>
+          </div>
+
+          <div x-show="todoForm.is_recurring" class="pt-2">
+            <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_repeat_interval')"></label>
+            <div class="grid grid-cols-2 gap-3">
+              <input type="number" x-model.number="todoForm.repeat_interval_value" min="1" max="999" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-purple-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+              <select x-model="todoForm.repeat_interval_unit" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-purple-500 focus:outline-none rounded-lg text-sm text-white">
+                <option value="minutes" x-text="t('unit_minutes')"></option>
+                <option value="hours" x-text="t('unit_hours')"></option>
+                <option value="days" x-text="t('unit_days')"></option>
+                <option value="weeks" x-text="t('unit_weeks')"></option>
+                <option value="months" x-text="t('unit_months')"></option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 确认方式 (自动确认 vs 手动确认) -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <label class="block text-xs font-semibold text-amber-400 uppercase tracking-wider" x-text="t('lbl_confirm_mode')"></label>
+          <div class="space-y-2">
+            <label class="flex items-start space-x-2.5 p-3 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.confirm_type === 'auto' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" value="auto" x-model="todoForm.confirm_type" class="text-amber-600 focus:ring-0 mt-0.5">
+              <div>
+                <div class="text-xs font-semibold" x-text="t('mode_auto_confirm')"></div>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2.5 p-3 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.confirm_type === 'manual' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" value="manual" x-model="todoForm.confirm_type" class="text-amber-600 focus:ring-0 mt-0.5">
+              <div>
+                <div class="text-xs font-semibold" x-text="t('mode_manual_confirm')"></div>
+              </div>
+            </label>
+          </div>
+
+          <div x-show="todoForm.confirm_type === 'manual'" class="pt-2">
+            <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_remind_interval')"></label>
+            <div class="relative">
+              <input type="number" x-model.number="todoForm.remind_interval_minutes" min="1" max="1440" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+              <span class="absolute right-3 top-2 text-xs text-gray-500" x-text="lang === 'zh' ? '分钟' : 'mins'"></span>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1" x-text="t('remind_interval_hint')"></p>
+          </div>
+        </div>
+
+        <!-- 专属 Webhook 覆盖配置 -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" x-model="todoForm.overrideWebhook" class="rounded bg-brand-dark border-brand-border text-indigo-600 focus:ring-0">
+            <span class="text-xs font-semibold text-gray-300" x-text="t('lbl_todo_webhook_override')"></span>
+          </label>
+
+          <div x-show="todoForm.overrideWebhook" class="space-y-3 pt-2">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_dedicated_url')"></label>
+              <input type="url" x-model="todoForm.webhookUrl" placeholder="https://api.example.com/todo-webhook?title={title}&date={date}" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_dedicated_method')"></label>
+              <select x-model="todoForm.webhookMethod" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+                <option value="" x-text="t('method_inherit')"></option>
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+              </select>
+            </div>
+            <div x-show="todoForm.webhookMethod === 'POST' || (!todoForm.webhookMethod && globalWebhook.method === 'POST')">
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_dedicated_body')"></label>
+              <textarea x-model="todoForm.webhookCustomBody" rows="2" placeholder='{"title": "{title}", "content": "{content}", "due_date": "{due_date}"}' class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部按纽 -->
+      <div class="mt-6 flex items-center justify-end space-x-3 pt-3 border-t border-brand-border">
+        <button @click="closeTodoModal()" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition" x-text="t('btn_cancel')"></button>
+        <button @click="saveTodo()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span x-text="t('btn_save_todo')"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框：重置并重新激活待办 -->
+  <div x-show="showResetTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showResetTodoModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
+      <button @click="showResetTodoModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 class="text-md font-bold text-white mb-2 flex items-center space-x-2">
+        <i data-lucide="rotate-ccw" class="w-5 h-5 text-indigo-400"></i>
+        <span x-text="t('modal_reset_title')"></span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-4" x-text="lang === 'zh' ? '将已完成的待办任务重新激活并调度至新的目标时间。' : 'Reactivate this completed todo and schedule to a new target time.'"></p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2" x-text="t('lbl_reset_target')"></label>
+          <input type="datetime-local" x-model="resetTargetDate" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+        </div>
+        <button @click="confirmResetTodo()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition font-semibold text-sm flex items-center justify-center space-x-2 shadow-sm">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span x-text="t('btn_confirm_reset')"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast 提示弹出框 -->
   <div class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none">
     <template x-for="toast in toasts" :key="toast.id">
@@ -1012,7 +1521,72 @@
             placeholder_msg_id_desc: "消息在 Telegram 中分配的唯一 ID",
             placeholder_chat_id_desc: "消息来源会话数字 ID",
             placeholder_sender_id_desc: "发送人数字 ID",
-            placeholder_date_desc: "消息/事件时间 (格式如: 2026/08/05 13:24)"
+            placeholder_date_desc: "消息/事件时间 (格式如: 2026/08/05 13:24)",
+            // 待办提醒
+            tab_tg_monitor: "TG 消息监控",
+            tab_scheduled_todos: "定时待办提醒",
+            card_todos: "定时待办提醒",
+            todo_desc: "可设定未来日期或相对天数推算，支持单次或周期循环执行、到期自动或手动确认持续催办，并通过 Webhook 实时通知。",
+            btn_new_todo: "新建待办提醒",
+            stat_all_todos: "全部待办",
+            stat_pending_todos: "等待到期",
+            stat_confirming_todos: "待确认催办中",
+            stat_completed_todos: "已完成",
+            filter_all: "全部",
+            filter_pending: "等待到期",
+            filter_confirming: "待确认 (催办中)",
+            filter_completed: "已完成",
+            no_todos_title: "暂无待办提醒任务",
+            no_todos_desc: "点击右上角「新建待办提醒」，支持根据具体日期或未来天数智能推算提醒时间，并配置单次或循环 Webhook 触发。",
+            todo_status_pending: "⏳ 等待到期",
+            todo_status_confirming: "🚨 待确认 (催办中)",
+            todo_status_completed: "✅ 已完成",
+            todo_status_disabled: "⏸️ 已暂停",
+            todo_status_overdue: "⚠️ 已到期待办",
+            todo_tag_once: "⚡ 单次执行",
+            todo_tag_recurring: "🔁 循环执行",
+            todo_tag_auto_confirm: "🤖 自动确认",
+            todo_tag_manual_confirm: "👆 手动确认",
+            lbl_target_time: "设定目标时间",
+            lbl_remaining_time: "距离待办时间",
+            lbl_created_at: "创建时间",
+            lbl_last_trigger: "最近触发",
+            lbl_completed_at: "完成时间",
+            btn_complete_todo: "确认完成待办",
+            btn_reactivate_todo: "重新激活",
+            btn_test_todo: "测试发送",
+            modal_new_todo_title: "新建定时待办提醒",
+            modal_edit_todo_title: "编辑定时待办提醒",
+            lbl_todo_title: "待办任务标题",
+            ph_todo_title: "例如：服务器续费提醒 / 客户回访通知",
+            lbl_todo_content: "待办内容与详情 (可选)",
+            ph_todo_content: "请在此输入任务具体说明、备忘要点或操作提示...",
+            lbl_date_mode: "日期设定方式",
+            mode_offset_days: "📅 指定未来天数 (智能推算)",
+            mode_exact_datetime: "⏰ 选择具体日期时间",
+            lbl_offset_days: "未来天数 (天后)",
+            lbl_offset_time: "当天提醒时间",
+            lbl_calc_target: "💡 智能推算目标时间：",
+            lbl_exact_datetime: "具体到期时间",
+            lbl_exec_mode: "执行模式",
+            mode_once: "⚡ 单次执行 (到期完成)",
+            mode_recurring: "🔁 循环执行 (按周期重复)",
+            lbl_repeat_interval: "循环周期",
+            unit_minutes: "分钟",
+            unit_hours: "小时",
+            unit_days: "天",
+            unit_weeks: "周",
+            unit_months: "个月",
+            lbl_confirm_mode: "确认机制",
+            mode_auto_confirm: "🤖 自动确认 (到期自动发送 1 次 Webhook 并完成/进入下周期)",
+            mode_manual_confirm: "👆 手动确认 (到期触发后必须手动点击完成，未完成则持续催办)",
+            lbl_remind_interval: "未确认催办间隔 (分钟)",
+            remind_interval_hint: "当任务到期后未手动确认时，系统每隔指定分钟数自动循环发送 Webhook 催办，直到点击完成。",
+            lbl_todo_webhook_override: "自定义待办专属 Webhook (覆盖全局)",
+            btn_save_todo: "保存待办任务",
+            modal_reset_title: "重置并重新激活待办",
+            lbl_reset_target: "重新设定目标时间",
+            btn_confirm_reset: "确认重置激活"
           },
           en: {
             app_title: "TG Msg Monitor",
@@ -1116,7 +1690,72 @@
             placeholder_msg_id_desc: "Unique message ID under TG",
             placeholder_chat_id_desc: "Target chat integer ID",
             placeholder_sender_id_desc: "Sender user integer ID",
-            placeholder_date_desc: "Message/event datetime string (e.g., 2026/08/05 13:24)"
+            placeholder_date_desc: "Message/event datetime string (e.g., 2026/08/05 13:24)",
+            // Scheduled Todo
+            tab_tg_monitor: "TG Monitor",
+            tab_scheduled_todos: "Scheduled Todos",
+            card_todos: "Scheduled Reminders & Todos",
+            todo_desc: "Set reminders by exact date or offset days, with single/recurring execution, auto/manual confirmation with continuous follow-ups, and real-time Webhooks.",
+            btn_new_todo: "New Todo Reminder",
+            stat_all_todos: "All Todos",
+            stat_pending_todos: "Pending",
+            stat_confirming_todos: "Pending Confirm",
+            stat_completed_todos: "Completed",
+            filter_all: "All",
+            filter_pending: "Pending",
+            filter_confirming: "Pending Confirm",
+            filter_completed: "Completed",
+            no_todos_title: "No Scheduled Todos",
+            no_todos_desc: "Click 'New Todo Reminder' above to set reminders with date calculation, recurring schedules, and Webhooks.",
+            todo_status_pending: "⏳ Pending",
+            todo_status_confirming: "🚨 Pending Confirm",
+            todo_status_completed: "✅ Completed",
+            todo_status_disabled: "⏸️ Paused",
+            todo_status_overdue: "⚠️ Due / Overdue",
+            todo_tag_once: "⚡ Once",
+            todo_tag_recurring: "🔁 Recurring",
+            todo_tag_auto_confirm: "🤖 Auto Confirm",
+            todo_tag_manual_confirm: "👆 Manual Confirm",
+            lbl_target_time: "Target Time",
+            lbl_remaining_time: "Remaining Time",
+            lbl_created_at: "Created",
+            lbl_last_trigger: "Last Triggered",
+            lbl_completed_at: "Completed",
+            btn_complete_todo: "Confirm Complete",
+            btn_reactivate_todo: "Reactivate",
+            btn_test_todo: "Test Dispatch",
+            modal_new_todo_title: "Create Scheduled Todo",
+            modal_edit_todo_title: "Edit Scheduled Todo",
+            lbl_todo_title: "Todo Title",
+            ph_todo_title: "e.g., Server renewal reminder",
+            lbl_todo_content: "Details & Notes (Optional)",
+            ph_todo_content: "Enter description, memo, or instructions...",
+            lbl_date_mode: "Date Input Mode",
+            mode_offset_days: "📅 Offset Days (Smart Calculation)",
+            mode_exact_datetime: "⏰ Exact Date & Time",
+            lbl_offset_days: "Days from now",
+            lbl_offset_time: "Time of day",
+            lbl_calc_target: "💡 Calculated Target Time:",
+            lbl_exact_datetime: "Exact Date & Time",
+            lbl_exec_mode: "Execution Mode",
+            mode_once: "⚡ Once (Complete when due)",
+            mode_recurring: "🔁 Recurring (Repeats by interval)",
+            lbl_repeat_interval: "Repeat Interval",
+            unit_minutes: "Minutes",
+            unit_hours: "Hours",
+            unit_days: "Days",
+            unit_weeks: "Weeks",
+            unit_months: "Months",
+            lbl_confirm_mode: "Confirmation Mode",
+            mode_auto_confirm: "🤖 Auto Confirm (Triggers Webhook once & marks done/next)",
+            mode_manual_confirm: "👆 Manual Confirm (Requires manual complete click; retries until confirmed)",
+            lbl_remind_interval: "Unconfirmed Retry Interval (Mins)",
+            remind_interval_hint: "If not confirmed after due time, Webhook will be sent repeatedly every N minutes until confirmed.",
+            lbl_todo_webhook_override: "Dedicated Webhook for this Todo",
+            btn_save_todo: "Save Todo",
+            modal_reset_title: "Reset & Reactivate Todo",
+            lbl_reset_target: "New Target Date & Time",
+            btn_confirm_reset: "Confirm Reactivate"
           }
         },
         t(key) {
@@ -1129,6 +1768,13 @@
         },
         accounts: [],
         rules: [],
+        todos: [],
+        currentTab: 'tg_monitor',
+        todoFilter: 'all',
+        showTodoModal: false,
+        showResetTodoModal: false,
+        resetTodoId: null,
+        resetTargetDate: "",
         globalWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
         offlineWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
         refreshing: false,
@@ -1188,6 +1834,39 @@
           webhookCustomBody: ""
         },
 
+        // 待办参数表单
+        todoForm: {
+          isEdit: false,
+          id: "",
+          title: "",
+          content: "",
+          dateMode: "offset_days", // 'offset_days' | 'exact_datetime'
+          offsetDays: 1,
+          offsetTime: "10:00",
+          exactDateTime: "",
+          is_recurring: false,
+          repeat_interval_value: 1,
+          repeat_interval_unit: "days",
+          confirm_type: "auto", // 'auto' | 'manual'
+          remind_interval_minutes: 30,
+          overrideWebhook: false,
+          webhookUrl: "",
+          webhookMethod: "",
+          webhookCustomBody: ""
+        },
+
+        get pendingConfirmCount() {
+          return this.todos.filter(t => t.status === 'pending_confirm' && t.is_enabled).length;
+        },
+
+        get filteredTodos() {
+          if (this.todoFilter === 'all') return this.todos;
+          if (this.todoFilter === 'pending') return this.todos.filter(t => t.status === 'pending' && t.is_enabled);
+          if (this.todoFilter === 'pending_confirm') return this.todos.filter(t => t.status === 'pending_confirm');
+          if (this.todoFilter === 'completed') return this.todos.filter(t => t.status === 'completed');
+          return this.todos;
+        },
+
         // Toast 消息
         toasts: [],
 
@@ -1197,10 +1876,11 @@
           } else {
             this.$nextTick(() => lucide.createIcons());
           }
-          // 每 5 秒轮询一次账号状态，保持同步
+          // 每 5 秒轮询一次账号与待办状态，保持同步
           setInterval(() => {
             if (this.isLoggedIn) {
               this.fetchAccountsSilently();
+              this.fetchTodosSilently();
             }
           }, 5000);
         },
@@ -1306,12 +1986,13 @@
             await Promise.all([
               this.fetchAccounts(),
               this.fetchRules(),
+              this.fetchTodos(),
               this.fetchWebhookConfig(),
               this.fetchOfflineWebhookConfig()
             ]);
-            this.showToast("数据加载成功");
+            this.showToast(this.lang === 'zh' ? "数据加载成功" : "Data refreshed");
           } catch (e) {
-            this.showToast("加载数据失败", "error");
+            this.showToast(this.lang === 'zh' ? "加载数据失败" : "Failed to load data", "error");
           } finally {
             this.refreshing = false;
           }
@@ -1758,6 +2439,310 @@
             this.testingWebhook = false;
             this.testingOfflineWebhook = false;
             this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        // --- 待办提醒函数与 API ---
+        computeOffsetTarget() {
+          const d = new Date();
+          const days = parseInt(this.todoForm.offsetDays) || 0;
+          d.setDate(d.getDate() + days);
+          const timeParts = (this.todoForm.offsetTime || "10:00").split(":");
+          const h = parseInt(timeParts[0]) || 0;
+          const m = parseInt(timeParts[1]) || 0;
+          d.setHours(h, m, 0, 0);
+
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const date = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          const sec = "00";
+          return `${year}-${month}-${date} ${hour}:${min}:${sec}`;
+        },
+
+        setQuickExactDate(days) {
+          const d = new Date();
+          d.setDate(d.getDate() + days);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const date = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          this.todoForm.exactDateTime = `${year}-${month}-${date}T${hour}:${min}`;
+        },
+
+        formatUnitText(unit) {
+          unit = (unit || 'days').toLowerCase();
+          if (unit === 'minutes') return this.lang === 'zh' ? '分钟' : 'mins';
+          if (unit === 'hours') return this.lang === 'zh' ? '小时' : 'hours';
+          if (unit === 'days') return this.lang === 'zh' ? '天' : 'days';
+          if (unit === 'weeks') return this.lang === 'zh' ? '周' : 'weeks';
+          if (unit === 'months') return this.lang === 'zh' ? '个月' : 'months';
+          return unit;
+        },
+
+        formatRemainingTime(todo) {
+          if (todo.status === 'completed') {
+            return (this.lang === 'zh' ? '已于 ' : 'Done at ') + (todo.completed_at || todo.target_date) + (this.lang === 'zh' ? ' 完成' : '');
+          }
+          if (todo.status === 'pending_confirm') {
+            return (this.lang === 'zh' ? `待确认 (每 ${todo.remind_interval_minutes || 30} 分钟催办一次)` : `Pending Confirm (${todo.remind_interval_minutes || 30}m retry)`);
+          }
+          if (!todo.target_date) return '';
+          
+          const target = new Date(todo.target_date.replace(/-/g, '/'));
+          if (isNaN(target.getTime())) return todo.target_date;
+          
+          const now = new Date();
+          const diffMs = target.getTime() - now.getTime();
+          
+          if (diffMs < 0) {
+            const totalHours = Math.floor(Math.abs(diffMs) / 3600000);
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+            if (days > 0) {
+              return this.lang === 'zh' ? `已到期 (逾期 ${days} 天 ${hours} 小时)` : `Due (${days}d ${hours}h ago)`;
+            } else {
+              return this.lang === 'zh' ? `已到期 (逾期 ${totalHours} 小时)` : `Due (${totalHours}h ago)`;
+            }
+          } else {
+            const totalMins = Math.floor(diffMs / 60000);
+            const totalHours = Math.floor(totalMins / 60);
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+            const mins = totalMins % 60;
+            if (days > 0) {
+              return this.lang === 'zh' ? `还剩 ${days} 天 ${hours} 小时` : `Remaining ${days}d ${hours}h`;
+            } else if (hours > 0) {
+              return this.lang === 'zh' ? `还剩 ${hours} 小时 ${mins} 分钟` : `Remaining ${hours}h ${mins}m`;
+            } else {
+              return this.lang === 'zh' ? `还剩 ${mins} 分钟 (即将到期)` : `Remaining ${mins}m (Soon)`;
+            }
+          }
+        },
+
+        async fetchTodos() {
+          try {
+            const res = await this.apiFetch("/api/todos");
+            this.todos = await res.json();
+            this.$nextTick(() => lucide.createIcons());
+          } catch(e) {}
+        },
+
+        async fetchTodosSilently() {
+          try {
+            const res = await this.apiFetch("/api/todos");
+            this.todos = await res.json();
+            this.$nextTick(() => lucide.createIcons());
+          } catch(e) {}
+        },
+
+        openTodoModal(todo = null) {
+          if (todo) {
+            const isRecur = !!todo.is_recurring;
+            const isManual = todo.confirm_type === 'manual';
+            this.todoForm = {
+              isEdit: true,
+              id: todo.id,
+              title: todo.title,
+              content: todo.content || "",
+              dateMode: "exact_datetime",
+              offsetDays: 1,
+              offsetTime: "10:00",
+              exactDateTime: todo.target_date ? todo.target_date.replace(' ', 'T').substring(0, 16) : "",
+              is_recurring: isRecur,
+              repeat_interval_value: todo.repeat_interval_value || 1,
+              repeat_interval_unit: todo.repeat_interval_unit || "days",
+              confirm_type: isManual ? "manual" : "auto",
+              remind_interval_minutes: todo.remind_interval_minutes || 30,
+              overrideWebhook: !!(todo.webhook && todo.webhook.url),
+              webhookUrl: (todo.webhook && todo.webhook.url) || "",
+              webhookMethod: (todo.webhook && todo.webhook.method) || "",
+              webhookCustomBody: (todo.webhook && todo.webhook.custom_body) || ""
+            };
+          } else {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            this.todoForm = {
+              isEdit: false,
+              id: "todo_" + Math.random().toString(36).substr(2, 9),
+              title: "",
+              content: "",
+              dateMode: "offset_days",
+              offsetDays: 1,
+              offsetTime: `${h}:${m}`,
+              exactDateTime: "",
+              is_recurring: false,
+              repeat_interval_value: 1,
+              repeat_interval_unit: "days",
+              confirm_type: "auto",
+              remind_interval_minutes: 30,
+              overrideWebhook: false,
+              webhookUrl: "",
+              webhookMethod: "",
+              webhookCustomBody: ""
+            };
+            this.setQuickExactDate(1);
+          }
+          this.showTodoModal = true;
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        closeTodoModal() {
+          this.showTodoModal = false;
+        },
+
+        async saveTodo() {
+          if (!this.todoForm.title || !this.todoForm.title.trim()) {
+            this.showToast(this.lang === 'zh' ? "请填写待办标题" : "Please enter todo title", "error");
+            return;
+          }
+
+          let finalTargetDate = "";
+          if (this.todoForm.dateMode === 'offset_days') {
+            finalTargetDate = this.computeOffsetTarget();
+          } else {
+            if (!this.todoForm.exactDateTime) {
+              this.showToast(this.lang === 'zh' ? "请选择具体到期时间" : "Please select target datetime", "error");
+              return;
+            }
+            finalTargetDate = this.todoForm.exactDateTime.replace('T', ' ');
+            if (finalTargetDate.length === 16) {
+              finalTargetDate += ":00";
+            }
+          }
+
+          const payload = {
+            id: this.todoForm.id,
+            title: this.todoForm.title.trim(),
+            content: (this.todoForm.content || "").trim(),
+            target_date: finalTargetDate,
+            is_recurring: this.todoForm.is_recurring,
+            repeat_interval_value: parseInt(this.todoForm.repeat_interval_value) || 1,
+            repeat_interval_unit: this.todoForm.repeat_interval_unit || "days",
+            confirm_type: this.todoForm.confirm_type || "auto",
+            remind_interval_minutes: parseInt(this.todoForm.remind_interval_minutes) || 30,
+            webhook: {
+              url: this.todoForm.overrideWebhook ? (this.todoForm.webhookUrl || "").trim() : "",
+              method: this.todoForm.overrideWebhook ? this.todoForm.webhookMethod : "",
+              custom_body: this.todoForm.overrideWebhook ? this.todoForm.webhookCustomBody : ""
+            },
+            is_enabled: true
+          };
+
+          try {
+            const url = this.todoForm.isEdit ? `/api/todos/${this.todoForm.id}` : "/api/todos";
+            const method = this.todoForm.isEdit ? "PUT" : "POST";
+            const res = await this.apiFetch(url, {
+              method: method,
+              body: payload
+            });
+
+            if (res.ok) {
+              this.showToast(this.todoForm.isEdit ? (this.lang === 'zh' ? "待办提醒已更新" : "Todo updated") : (this.lang === 'zh' ? "待办提醒创建成功" : "Todo created"));
+              this.closeTodoModal();
+              this.fetchTodos();
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "保存失败", "error");
+            }
+          } catch(e) {
+            this.showToast("网络请求异常: " + e, "error");
+          }
+        },
+
+        async deleteTodo(id) {
+          try {
+            const res = await this.apiFetch(`/api/todos/${id}`, { method: "DELETE" });
+            if (res.ok) {
+              this.showToast(this.lang === 'zh' ? "待办已删除" : "Todo deleted");
+              this.fetchTodos();
+            } else {
+              this.showToast("删除失败", "error");
+            }
+          } catch(e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        async toggleTodo(id) {
+          try {
+            const res = await this.apiFetch(`/api/todos/${id}/toggle`, { method: "POST" });
+            if (res.ok) {
+              const data = await res.json();
+              this.showToast(data.message);
+              this.fetchTodos();
+            }
+          } catch(e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        async completeTodo(id) {
+          try {
+            const res = await this.apiFetch(`/api/todos/${id}/complete`, { method: "POST" });
+            if (res.ok) {
+              const data = await res.json();
+              this.showToast(data.message);
+              this.fetchTodos();
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "操作失败", "error");
+            }
+          } catch(e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        openResetTodoModal(todo) {
+          this.resetTodoId = todo.id;
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const date = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          this.resetTargetDate = `${year}-${month}-${date}T${hour}:${min}`;
+          this.showResetTodoModal = true;
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        async confirmResetTodo() {
+          if (!this.resetTargetDate) {
+            this.showToast(this.lang === 'zh' ? "请选择新的目标时间" : "Please select target time", "error");
+            return;
+          }
+          let formattedDate = this.resetTargetDate.replace('T', ' ');
+          if (formattedDate.length === 16) formattedDate += ":00";
+
+          try {
+            const res = await this.apiFetch(`/api/todos/${this.resetTodoId}/reset`, {
+              method: "POST",
+              body: { target_date: formattedDate }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              this.showToast(data.message);
+              this.showResetTodoModal = false;
+              this.fetchTodos();
+            }
+          } catch(e) {
+            this.showToast("网络请求异常", "error");
+          }
+        },
+
+        async triggerTestTodo(id) {
+          try {
+            const res = await this.apiFetch(`/api/todos/${id}/trigger-test`, { method: "POST" });
+            if (res.ok) {
+              const data = await res.json();
+              this.showToast(data.message);
+            }
+          } catch(e) {
+            this.showToast("网络请求异常", "error");
           }
         }
       }

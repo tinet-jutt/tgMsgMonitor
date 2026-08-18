@@ -15,7 +15,8 @@ from telethon.errors import (
     UserDeactivatedBanError,
     SessionRevokedError
 )
-from datetime import datetime
+from datetime import datetime, timedelta
+import calendar
 from loguru import logger
 import httpx
 import secrets
@@ -105,11 +106,35 @@ class AccountModel(BaseModel):
     session_name: str
     is_active: bool = False
 
+class TodoWebhook(BaseModel):
+    url: str = ""
+    method: str = ""  # 为空时继承全局
+    custom_body: str = ""
+
+class TodoModel(BaseModel):
+    id: str
+    title: str
+    content: str = ""
+    target_date: str
+    is_recurring: bool = False
+    repeat_interval_value: int = 1
+    repeat_interval_unit: str = "days"  # minutes, hours, days, weeks, months
+    confirm_type: str = "auto"  # auto / manual
+    remind_interval_minutes: int = 30
+    webhook: TodoWebhook = TodoWebhook()
+    is_enabled: bool = True
+    status: str = "pending"  # pending, pending_confirm, completed
+    last_trigger_time: Optional[str] = None
+    last_remind_time: Optional[str] = None
+    completed_at: Optional[str] = None
+    created_at: Optional[str] = None
+
 class SystemConfig(BaseModel):
     accounts: List[AccountModel] = []
     global_webhook: GlobalWebhookConfig = GlobalWebhookConfig()
     offline_webhook: OfflineWebhookConfig = OfflineWebhookConfig()
     rules: List[RuleModel] = []
+    todos: List[TodoModel] = []
 
 # 登录 API 参数模型
 class SendCodeReq(BaseModel):
@@ -144,7 +169,8 @@ class ConfigManager:
             "accounts": [],
             "global_webhook": {"url": "", "timeout": 10, "method": "POST", "custom_body": ""},
             "offline_webhook": {"url": "", "timeout": 10, "method": "POST", "custom_body": ""},
-            "rules": []
+            "rules": [],
+            "todos": []
         }
         self.load()
 
@@ -163,6 +189,9 @@ class ConfigManager:
                     updated = True
                 if "offline_webhook" not in self.config:
                     self.config["offline_webhook"] = {"url": "", "timeout": 10, "method": "POST", "custom_body": ""}
+                    updated = True
+                if "todos" not in self.config:
+                    self.config["todos"] = []
                     updated = True
                 if updated:
                     self.save_sync()
@@ -719,12 +748,245 @@ class TelegramManager:
                 pass
         logger.info("所有 Telegram 客户端连接已关闭。")
 
+# ----------------- 待办日期推算与守护管理器 -----------------
+
+def parse_target_datetime(dt_str: Optional[str]) -> Optional[datetime]:
+    """解析多种常用日期时间格式为 datetime 对象"""
+    if not dt_str:
+        return None
+    dt_str = str(dt_str).strip()
+    formats = [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(dt_str, fmt)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(dt_str)
+    except Exception:
+        pass
+    return None
+
+def advance_datetime_by_interval(dt: datetime, val: int, unit: str) -> datetime:
+    """根据给定的周期数值和单位推进 datetime"""
+    if val <= 0:
+        val = 1
+    unit = (unit or "days").lower()
+    if unit in ("minute", "minutes", "m", "min"):
+        return dt + timedelta(minutes=val)
+    elif unit in ("hour", "hours", "h"):
+        return dt + timedelta(hours=val)
+    elif unit in ("day", "days", "d"):
+        return dt + timedelta(days=val)
+    elif unit in ("week", "weeks", "w"):
+        return dt + timedelta(weeks=val)
+    elif unit in ("month", "months"):
+        month = dt.month - 1 + val
+        year = dt.year + month // 12
+        month = month % 12 + 1
+        day = min(dt.day, calendar.monthrange(year, month)[1])
+        return dt.replace(year=year, month=month, day=day)
+    return dt + timedelta(days=val)
+
+def advance_target_to_future(target_dt: datetime, val: int, unit: str, now_dt: Optional[datetime] = None) -> datetime:
+    """循环推进日期，直到超过当前时间"""
+    if now_dt is None:
+        now_dt = datetime.now()
+    cur = target_dt
+    cur = advance_datetime_by_interval(cur, val, unit)
+    count = 0
+    while cur <= now_dt and count < 1000:
+        cur = advance_datetime_by_interval(cur, val, unit)
+        count += 1
+    return cur
+
+class TodoManager:
+    def __init__(self, config_manager: ConfigManager):
+        self.config_manager = config_manager
+        self.running = False
+
+    async def start_scheduler(self):
+        self.running = True
+        logger.info("已启动定时待办提醒守护任务。")
+        while self.running:
+            try:
+                await self.check_and_trigger_todos()
+            except Exception as e:
+                logger.error(f"待办提醒巡检异常: {e}")
+            await asyncio.sleep(10)
+
+    async def trigger_todo_webhook(self, todo: dict, is_retry: bool = False):
+        """触发待办提醒 Webhook"""
+        config = await self.config_manager.get_config()
+        global_webhook = config.get("global_webhook", {})
+        todo_webhook = todo.get("webhook", {})
+
+        url = (todo_webhook.get("url") or "").strip()
+        if not url:
+            url = (global_webhook.get("url") or "").strip()
+            timeout = global_webhook.get("timeout", 10)
+            method = global_webhook.get("method", "POST")
+            custom_body = global_webhook.get("custom_body", "")
+        else:
+            timeout = global_webhook.get("timeout", 10)
+            method = todo_webhook.get("method") or global_webhook.get("method") or "POST"
+            custom_body = todo_webhook.get("custom_body", "")
+
+        if not url:
+            logger.warning(f"待办 [{todo.get('title')}] 触发提醒，但未配置 Webhook URL，跳过发送。")
+            return
+
+        now_str = format_datetime()
+        title = todo.get("title", "")
+        content = todo.get("content", "")
+        target_date = todo.get("target_date", "")
+        confirm_type_str = "手动确认" if todo.get("confirm_type") == "manual" else "自动确认"
+        recurring_str = f"循环执行 (每 {todo.get('repeat_interval_value', 1)} {todo.get('repeat_interval_unit', 'days')})" if todo.get("is_recurring") else "单次执行"
+        
+        if is_retry:
+            text = f"【待办催办提醒】您的待办任务「{title}」已到期且尚未确认完成！\n到期时间：{target_date}\n任务内容：{content or '无'}"
+        else:
+            text = f"【待办提醒】您的待办任务「{title}」已到期！\n到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+
+        placeholder_data = {
+            "event": "todo_reminder",
+            "todo_id": todo.get("id", ""),
+            "title": title,
+            "content": content,
+            "target_date": target_date,
+            "due_date": target_date,
+            "date": now_str,
+            "confirm_type": confirm_type_str,
+            "is_recurring": recurring_str,
+            "status": todo.get("status", "pending"),
+            "text": text
+        }
+
+        final_url = resolve_placeholders(url, placeholder_data, method)
+        logger.info(f"正在发送待办提醒 Webhook [{title}] (is_retry={is_retry}) 到 {final_url}...")
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                if method.upper() == "GET":
+                    resp = await client.get(final_url)
+                else:
+                    if custom_body and custom_body.strip():
+                        resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
+                        try:
+                            payload = json.loads(resolved_body)
+                            resp = await client.post(final_url, json=payload)
+                        except json.JSONDecodeError:
+                            headers = {"Content-Type": "application/json"}
+                            resp = await client.post(final_url, content=resolved_body, headers=headers)
+                    else:
+                        payload = {
+                            "event": "todo_reminder",
+                            "is_retry": is_retry,
+                            "todo_id": todo.get("id"),
+                            "title": title,
+                            "content": content,
+                            "target_date": target_date,
+                            "confirm_type": todo.get("confirm_type", "auto"),
+                            "is_recurring": todo.get("is_recurring", False),
+                            "trigger_time": now_str,
+                            "message": text
+                        }
+                        resp = await client.post(final_url, json=payload)
+                logger.info(f"待办 Webhook 推送完成 [{title}], 状态码: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"发送待办 Webhook 失败 [{title}]: {e}")
+
+    async def check_and_trigger_todos(self):
+        config = await self.config_manager.get_config()
+        todos = config.get("todos", [])
+        if not todos:
+            return
+
+        now = datetime.now()
+        now_str = format_datetime(now)
+        updated = False
+
+        for todo in todos:
+            if not todo.get("is_enabled", True):
+                continue
+
+            status = todo.get("status", "pending")
+            if status == "completed":
+                continue
+
+            target_str = todo.get("target_date", "")
+            target_dt = parse_target_datetime(target_str)
+            if not target_dt:
+                continue
+
+            confirm_type = todo.get("confirm_type", "auto")
+            is_recurring = todo.get("is_recurring", False)
+
+            # 1. 处于 pending 状态，检查是否到达触发时间
+            if status == "pending":
+                if now >= target_dt:
+                    logger.info(f"待办任务「{todo.get('title')}」已到期，开始触发提醒。")
+                    asyncio.create_task(self.trigger_todo_webhook(todo, is_retry=False))
+                    todo["last_trigger_time"] = now_str
+
+                    if confirm_type == "auto":
+                        if is_recurring:
+                            next_dt = advance_target_to_future(
+                                target_dt,
+                                todo.get("repeat_interval_value", 1),
+                                todo.get("repeat_interval_unit", "days"),
+                                now
+                            )
+                            todo["target_date"] = next_dt.strftime("%Y-%m-%d %H:%M:%S")
+                            todo["status"] = "pending"
+                            todo["completed_at"] = now_str
+                        else:
+                            todo["status"] = "completed"
+                            todo["completed_at"] = now_str
+                    else:
+                        # 手动确认模式：进入待确认催办状态
+                        todo["status"] = "pending_confirm"
+                        todo["last_remind_time"] = now_str
+                    updated = True
+
+            # 2. 处于 pending_confirm 状态（手动确认模式下催办）
+            elif status == "pending_confirm":
+                remind_interval_mins = todo.get("remind_interval_minutes", 30) or 30
+                last_remind_str = todo.get("last_remind_time") or todo.get("last_trigger_time")
+                last_remind_dt = parse_target_datetime(last_remind_str) if last_remind_str else None
+
+                should_remind = False
+                if not last_remind_dt:
+                    should_remind = True
+                else:
+                    elapsed_seconds = (now - last_remind_dt).total_seconds()
+                    if elapsed_seconds >= remind_interval_mins * 60:
+                        should_remind = True
+
+                if should_remind:
+                    logger.info(f"待办任务「{todo.get('title')}」尚未手动确认完成，按间隔({remind_interval_mins}分钟)发送催办 Webhook...")
+                    asyncio.create_task(self.trigger_todo_webhook(todo, is_retry=True))
+                    todo["last_remind_time"] = now_str
+                    updated = True
+
+        if updated:
+            await self.config_manager.save_config(config)
+
 # ----------------- FastAPI 初始化与路由 -----------------
 
 app = FastAPI(title="Telegram Message Monitor Admin API")
 
 config_manager = ConfigManager()
 tg_manager = TelegramManager(config_manager)
+todo_manager = TodoManager(config_manager)
 
 # 内存令牌缓存
 current_token: Optional[str] = None
@@ -818,10 +1080,13 @@ async def startup_event():
     asyncio.create_task(tg_manager.init_and_start_active_accounts())
     # 启动后台保活重连守护
     asyncio.create_task(tg_manager.start_keepalive_daemon())
+    # 启动待办提醒守护任务
+    asyncio.create_task(todo_manager.start_scheduler())
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await tg_manager.cleanup()
+    todo_manager.running = False
 
 # --- 账号管理 API ---
 
@@ -1247,3 +1512,162 @@ async def toggle_rule(rule_id: str):
     await config_manager.save_config(config)
     status_str = "启用" if rule["is_enabled"] else "暂停"
     return {"status": "success", "message": f"规则已{status_str}。"}
+
+# --- 定时待办提醒 API ---
+
+@app.get("/api/todos", dependencies=[Depends(verify_token)])
+async def get_todos():
+    config = await config_manager.get_config()
+    todos = config.get("todos", [])
+    now = datetime.now()
+
+    result = []
+    for t in todos:
+        item = dict(t)
+        target_str = t.get("target_date", "")
+        target_dt = parse_target_datetime(target_str)
+        if target_dt:
+            diff_sec = (target_dt - now).total_seconds()
+            item["remaining_seconds"] = int(diff_sec)
+            item["is_overdue"] = diff_sec < 0
+        else:
+            item["remaining_seconds"] = 0
+            item["is_overdue"] = False
+        result.append(item)
+    return result
+
+@app.post("/api/todos", dependencies=[Depends(verify_token)])
+async def create_todo(todo: TodoModel):
+    config = await config_manager.get_config()
+    if "todos" not in config:
+        config["todos"] = []
+
+    if any(t["id"] == todo.id for t in config["todos"]):
+        raise HTTPException(status_code=400, detail="待办 ID 已存在。")
+
+    todo_dict = todo.dict()
+    if not todo_dict.get("created_at"):
+        todo_dict["created_at"] = format_datetime()
+
+    config["todos"].append(todo_dict)
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "待办任务创建成功！", "todo": todo_dict}
+
+@app.put("/api/todos/{todo_id}", dependencies=[Depends(verify_token)])
+async def update_todo(todo_id: str, updated_todo: TodoModel):
+    config = await config_manager.get_config()
+    todos = config.get("todos", [])
+    todo_id = todo_id.strip()
+
+    index = -1
+    for i, t in enumerate(todos):
+        if t["id"] == todo_id:
+            index = i
+            break
+
+    if index == -1:
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    todo_dict = updated_todo.dict()
+    if not todo_dict.get("created_at"):
+        todo_dict["created_at"] = todos[index].get("created_at", format_datetime())
+
+    todos[index] = todo_dict
+    config["todos"] = todos
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "待办任务更新成功！", "todo": todo_dict}
+
+@app.delete("/api/todos/{todo_id}", dependencies=[Depends(verify_token)])
+async def delete_todo(todo_id: str):
+    config = await config_manager.get_config()
+    todo_id = todo_id.strip()
+
+    todos = config.get("todos", [])
+    new_todos = [t for t in todos if t["id"] != todo_id]
+    if len(new_todos) == len(todos):
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    config["todos"] = new_todos
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "待办任务删除成功！"}
+
+@app.post("/api/todos/{todo_id}/toggle", dependencies=[Depends(verify_token)])
+async def toggle_todo(todo_id: str):
+    config = await config_manager.get_config()
+    todo_id = todo_id.strip()
+
+    todo = next((t for t in config.get("todos", []) if t["id"] == todo_id), None)
+    if not todo:
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    todo["is_enabled"] = not todo.get("is_enabled", True)
+    await config_manager.save_config(config)
+    status_str = "启用" if todo["is_enabled"] else "暂停"
+    return {"status": "success", "message": f"待办任务已{status_str}。", "is_enabled": todo["is_enabled"]}
+
+@app.post("/api/todos/{todo_id}/complete", dependencies=[Depends(verify_token)])
+async def complete_todo(todo_id: str):
+    config = await config_manager.get_config()
+    todo_id = todo_id.strip()
+
+    todo = next((t for t in config.get("todos", []) if t["id"] == todo_id), None)
+    if not todo:
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    now = datetime.now()
+    now_str = format_datetime(now)
+
+    if todo.get("is_recurring", False):
+        target_str = todo.get("target_date", "")
+        target_dt = parse_target_datetime(target_str) or now
+        next_dt = advance_target_to_future(
+            target_dt,
+            todo.get("repeat_interval_value", 1),
+            todo.get("repeat_interval_unit", "days"),
+            now
+        )
+        todo["target_date"] = next_dt.strftime("%Y-%m-%d %H:%M:%S")
+        todo["status"] = "pending"
+        todo["completed_at"] = now_str
+        todo["last_remind_time"] = None
+        message = f"待办「{todo.get('title')}」已完成！已自动调度至下一周期：{todo['target_date']}"
+    else:
+        todo["status"] = "completed"
+        todo["completed_at"] = now_str
+        todo["last_remind_time"] = None
+        message = f"待办「{todo.get('title')}」已确认完成！"
+
+    await config_manager.save_config(config)
+    return {"status": "success", "message": message, "todo": todo}
+
+@app.post("/api/todos/{todo_id}/reset", dependencies=[Depends(verify_token)])
+async def reset_todo(todo_id: str, payload: Optional[Dict[str, Any]] = None):
+    config = await config_manager.get_config()
+    todo_id = todo_id.strip()
+
+    todo = next((t for t in config.get("todos", []) if t["id"] == todo_id), None)
+    if not todo:
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    if payload and "target_date" in payload and payload["target_date"]:
+        todo["target_date"] = payload["target_date"]
+    todo["status"] = "pending"
+    todo["completed_at"] = None
+    todo["last_remind_time"] = None
+    todo["is_enabled"] = True
+
+    await config_manager.save_config(config)
+    return {"status": "success", "message": f"待办「{todo.get('title')}」已重置并重新激活！", "todo": todo}
+
+@app.post("/api/todos/{todo_id}/trigger-test", dependencies=[Depends(verify_token)])
+async def trigger_test_todo(todo_id: str):
+    config = await config_manager.get_config()
+    todo_id = todo_id.strip()
+
+    todo = next((t for t in config.get("todos", []) if t["id"] == todo_id), None)
+    if not todo:
+        raise HTTPException(status_code=404, detail="未找到该待办任务。")
+
+    asyncio.create_task(todo_manager.trigger_todo_webhook(todo, is_retry=False))
+    return {"status": "success", "message": f"已向待办「{todo.get('title')}」的 Webhook 发送测试提醒！"}
+
