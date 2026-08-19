@@ -11,5 +11,54 @@
     "method": "POST",
     "custom_body": ""
   },
-  "rules": []
+  "offline_webhook": {
+    "url": "",
+    "timeout": 10,
+    "method": "POST",
+    "custom_body": ""
+  },
+  "todo_webhook": {
+    "url": "",
+    "timeout": 10,
+    "method": "POST",
+    "custom_body": ""
+  },
+  "global_bark": {
+    "is_enabled": false,
+    "server_url": "https://api.day.app",
+    "device_key": "",
+    "group": "TG监控",
+    "sound": "",
+    "icon": "",
+    "level": "active",
+    "is_archive": 1,
+    "url": "",
+    "timeout": 10
+  },
+  "offline_bark": {
+    "is_enabled": false,
+    "server_url": "https://api.day.app",
+    "device_key": "",
+    "group": "账号告警",
+    "sound": "alarm",
+    "icon": "",
+    "level": "timeSensitive",
+    "is_archive": 1,
+    "url": "",
+    "timeout": 10
+  },
+  "todo_bark": {
+    "is_enabled": false,
+    "server_url": "https://api.day.app",
+    "device_key": "",
+    "group": "定时待办",
+    "sound": "alarm",
+    "icon": "",
+    "level": "timeSensitive",
+    "is_archive": 1,
+    "url": "",
+    "timeout": 10
+  },
+  "rules": [],
+  "todos": []
 }

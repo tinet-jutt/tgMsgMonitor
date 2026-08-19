@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Depends, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -73,6 +73,112 @@ def resolve_placeholders(url: str, placeholder_data: Dict[str, Any], method: str
 
     return new_url
 
+def resolve_template_text(template: str, placeholder_data: Dict[str, Any]) -> str:
+    """
+    替换文本模板中的占位符（如 {text}, {title}）为原始文本（不进行 URL 编码）。
+    用于 Bark 标题、正文、分组等文本字段。
+    """
+    if not template:
+        return ""
+    def replace_match(match):
+        key = match.group(1)
+        return str(placeholder_data.get(key, ""))
+    return re.sub(r'\{([a-zA-Z0-9_]+)\}', replace_match, template)
+
+def extract_bark_info(key_or_url: str, default_server: str = "https://api.day.app") -> Tuple[str, str]:
+    """
+    智能解析用户填写的 Bark 字符串：
+    支持直接填入 Device Key (如 'Nxxxyyy')，
+    或直接粘贴完整的 Bark 推送 URL (如 'https://api.day.app/Nxxxyyy' 或 'http://bark.myhost.com/Nxxxyyy/推送标题/正文')。
+    返回 (server_url, device_key)。
+    """
+    raw = (key_or_url or "").strip()
+    def_srv = (default_server or "https://api.day.app").strip().rstrip("/")
+    if not raw:
+        return def_srv, ""
+    if raw.startswith("http://") or raw.startswith("https://"):
+        parsed = urllib.parse.urlparse(raw)
+        server = f"{parsed.scheme}://{parsed.netloc}"
+        path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+        if path_parts:
+            key = path_parts[0]
+            return server, key
+        return server, ""
+    return def_srv, raw
+
+async def send_bark_push(
+    bark_config: Dict[str, Any],
+    title: str,
+    body: str,
+    placeholder_data: Dict[str, Any],
+    default_group: str = "TG监控",
+    default_sound: str = "",
+    default_level: str = "active"
+) -> Dict[str, Any]:
+    """
+    发送 Bark 推送通知，并返回统一诊断结果字典
+    """
+    raw_key = (bark_config.get("device_key") or "").strip()
+    default_srv = (bark_config.get("server_url") or "https://api.day.app").strip()
+    server_url, device_key = extract_bark_info(raw_key, default_srv)
+
+    if not device_key:
+        return {"status": "error", "code": None, "elapsed": 0, "response": "", "error": "未配置 Bark Device Key"}
+
+    timeout = bark_config.get("timeout", 10)
+    group = bark_config.get("group") if bark_config.get("group") is not None else default_group
+    sound = bark_config.get("sound") if bark_config.get("sound") is not None else default_sound
+    level = bark_config.get("level") if bark_config.get("level") is not None else default_level
+    icon = (bark_config.get("icon") or "").strip()
+    click_url = (bark_config.get("url") or "").strip()
+    is_archive = bark_config.get("is_archive", 1)
+
+    # 占位符解析
+    res_title = resolve_template_text(title, placeholder_data)
+    res_body = resolve_template_text(body, placeholder_data)
+    res_group = resolve_template_text(group, placeholder_data) if group else ""
+    res_icon = resolve_template_text(icon, placeholder_data) if icon else ""
+    res_click_url = resolve_template_text(click_url, placeholder_data) if click_url else ""
+
+    endpoint = f"{server_url}/push"
+    payload: Dict[str, Any] = {
+        "device_key": device_key,
+        "title": res_title,
+        "body": res_body,
+        "isArchive": is_archive
+    }
+    if res_group:
+        payload["group"] = res_group
+    if sound and sound != "default":
+        payload["sound"] = sound
+    if res_icon:
+        payload["icon"] = res_icon
+    if level and level != "active":
+        payload["level"] = level
+    if res_click_url:
+        payload["url"] = res_click_url
+
+    start_time = time.time()
+    masked_key = f"{device_key[:4]}***{device_key[-2:]}" if len(device_key) > 6 else "***"
+    logger.info(f"正在发送 Bark 推送通知 [{res_title}] 到 {endpoint} (Key: {masked_key})...")
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(endpoint, json=payload)
+            elapsed = int((time.time() - start_time) * 1000)
+            resp_text = resp.text[:1000]
+            if resp.status_code == 200:
+                logger.info(f"Bark 推送成功 [{res_title}], 响应: {resp_text}")
+                return {"status": "success", "code": resp.status_code, "elapsed": elapsed, "response": resp_text, "error": ""}
+            else:
+                logger.warning(f"Bark 推送返回异常状态码 [{res_title}]: {resp.status_code}, 内容: {resp_text}")
+                return {"status": "error", "code": resp.status_code, "elapsed": elapsed, "response": resp_text, "error": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        elapsed = int((time.time() - start_time) * 1000)
+        logger.error(f"发送 Bark 推送失败 [{res_title}]: {e}")
+        return {"status": "error", "code": None, "elapsed": elapsed, "response": "", "error": str(e)}
+
+
+
 # ----------------- Pydantic 模型 -----------------
 
 class GlobalWebhookConfig(BaseModel):
@@ -93,6 +199,18 @@ class TodoWebhookConfig(BaseModel):
     method: str = "POST"
     custom_body: str = ""
 
+class BarkConfig(BaseModel):
+    is_enabled: bool = False
+    server_url: str = "https://api.day.app"  # 官方服务或自建 Bark 服务
+    device_key: str = ""                     # Bark Device Key 或完整 URL
+    group: str = ""                          # 默认消息分组
+    sound: str = ""                          # 提示音 (如 minuet, birdsong, alarm 等)
+    icon: str = ""                           # 自定义通知图标 URL
+    level: str = "active"                    # active / timeSensitive / passive / critical
+    is_archive: int = 1                      # 1=保存历史, 0=不保存
+    url: str = ""                            # 点击通知跳转的链接 (支持占位符)
+    timeout: int = 10
+
 class RuleFilter(BaseModel):
     keywords: List[str] = []
     exclude_keywords: List[str] = []
@@ -104,13 +222,24 @@ class RuleWebhook(BaseModel):
     method: str = ""  # 为空时继承全局
     custom_body: str = ""
 
+class RuleBark(BaseModel):
+    is_enabled: bool = False
+    server_url: str = ""
+    device_key: str = ""
+    group: str = ""
+    sound: str = ""
+    icon: str = ""
+    level: str = ""
+    url: str = ""
+
 class RuleModel(BaseModel):
     id: str
     name: str
     accounts: List[str] = ["all"]  # 绑定手机号列表或 ["all"]
     targets: List[str] = []         # 监听的目标，例如 ["@group", "-1001234567"]
     filters: RuleFilter
-    webhook: RuleWebhook
+    webhook: RuleWebhook = RuleWebhook()
+    bark: RuleBark = RuleBark()
     debounce_seconds: int = 0      # 防抖冷却时间（秒），0 表示禁用
     is_enabled: bool = True
 
@@ -126,6 +255,16 @@ class TodoWebhook(BaseModel):
     method: str = ""  # 为空时继承全局
     custom_body: str = ""
 
+class TodoBark(BaseModel):
+    is_enabled: bool = False
+    server_url: str = ""
+    device_key: str = ""
+    group: str = ""
+    sound: str = ""
+    icon: str = ""
+    level: str = ""
+    url: str = ""
+
 class TodoModel(BaseModel):
     id: str
     title: str
@@ -137,6 +276,7 @@ class TodoModel(BaseModel):
     confirm_type: str = "auto"  # auto / manual
     remind_interval_minutes: int = 30
     webhook: TodoWebhook = TodoWebhook()
+    bark: TodoBark = TodoBark()
     is_enabled: bool = True
     status: str = "pending"  # pending, pending_confirm, completed
     last_trigger_time: Optional[str] = None
@@ -149,6 +289,9 @@ class SystemConfig(BaseModel):
     global_webhook: GlobalWebhookConfig = GlobalWebhookConfig()
     offline_webhook: OfflineWebhookConfig = OfflineWebhookConfig()
     todo_webhook: TodoWebhookConfig = TodoWebhookConfig()
+    global_bark: BarkConfig = BarkConfig(group="TG监控")
+    offline_bark: BarkConfig = BarkConfig(group="账号告警", sound="alarm", level="timeSensitive")
+    todo_bark: BarkConfig = BarkConfig(group="定时待办", sound="alarm", level="timeSensitive")
     rules: List[RuleModel] = []
     todos: List[TodoModel] = []
 
@@ -360,61 +503,91 @@ class TelegramManager:
         asyncio.create_task(self.trigger_offline_webhook(phone, reason))
 
     async def trigger_offline_webhook(self, phone: str, reason: str):
-        """触发账号下线 Webhook 告警通知"""
-        config = await self.config_manager.get_config()
-        offline_conf = config.get("offline_webhook", {})
-        url = offline_conf.get("url", "").strip()
-
-        if not url:
-            global_webhook = config.get("global_webhook", {})
-            url = global_webhook.get("url", "").strip()
-            timeout = global_webhook.get("timeout", 10)
-            method = global_webhook.get("method", "POST")
-            custom_body = global_webhook.get("custom_body", "")
-        else:
-            timeout = offline_conf.get("timeout", 10)
-            method = offline_conf.get("method", "POST")
-            custom_body = offline_conf.get("custom_body", "")
-
-        if not url:
-            logger.info("未配置账号下线 Webhook URL，跳过告警推送。")
-            return
-
-        now_str = format_datetime()
-        placeholder_data = {
-            "receiver_account": phone,
-            "phone": phone,
-            "reason": reason,
-            "date": now_str,
-            "event": "account_offline",
-            "text": f"【账号下线告警】Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
-        }
-
-        final_url = resolve_placeholders(url, placeholder_data, method)
-        logger.info(f"正在发送账号下线 Webhook 告警 [{phone}] 到 {final_url}...")
+        """触发账号下线 Webhook & Bark 告警通知"""
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                if method.upper() == "GET":
-                    resp = await client.get(final_url)
-                else:
-                    if custom_body and custom_body.strip():
-                        resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
-                        try:
-                            payload = json.loads(resolved_body)
-                            resp = await client.post(final_url, json=payload)
-                        except json.JSONDecodeError:
-                            headers = {"Content-Type": "application/json"}
-                            resp = await client.post(final_url, content=resolved_body, headers=headers)
-                    else:
-                        payload = {
-                            "event": "account_offline",
-                            "phone": phone,
-                            "reason": reason,
-                            "date": now_str,
-                            "message": f"Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
-                        }
-                        resp = await client.post(final_url, json=payload)
-                logger.info(f"账号下线 Webhook 推送完成 [{phone}], 状态码: {resp.status_code}")
+            config = await self.config_manager.get_config()
+            offline_conf = config.get("offline_webhook", {})
+            url = offline_conf.get("url", "").strip()
+
+            if not url:
+                global_webhook = config.get("global_webhook", {})
+                url = global_webhook.get("url", "").strip()
+                timeout = global_webhook.get("timeout", 10)
+                method = global_webhook.get("method", "POST")
+                custom_body = global_webhook.get("custom_body", "")
+            else:
+                timeout = offline_conf.get("timeout", 10)
+                method = offline_conf.get("method", "POST")
+                custom_body = offline_conf.get("custom_body", "")
+
+            now_str = format_datetime()
+            placeholder_data = {
+                "receiver_account": phone,
+                "phone": phone,
+                "reason": reason,
+                "date": now_str,
+                "event": "account_offline",
+                "text": f"【账号下线告警】Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
+            }
+
+            # A. 触发 Webhook 推送
+            if url:
+                final_url = resolve_placeholders(url, placeholder_data, method)
+                logger.info(f"正在发送账号下线 Webhook 告警 [{phone}] 到 {final_url}...")
+                try:
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        if method.upper() == "GET":
+                            resp = await client.get(final_url)
+                        else:
+                            if custom_body and custom_body.strip():
+                                resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
+                                try:
+                                    payload = json.loads(resolved_body)
+                                    resp = await client.post(final_url, json=payload)
+                                except json.JSONDecodeError:
+                                    headers = {"Content-Type": "application/json"}
+                                    resp = await client.post(final_url, content=resolved_body, headers=headers)
+                            else:
+                                payload = {
+                                    "event": "account_offline",
+                                    "phone": phone,
+                                    "reason": reason,
+                                    "date": now_str,
+                                    "message": f"Telegram 账号 [{phone}] 已离线/需重新登录！原因：{reason}"
+                                }
+                                resp = await client.post(final_url, json=payload)
+                        logger.info(f"账号下线 Webhook 推送完成 [{phone}], 状态码: {resp.status_code}")
+                except Exception as e:
+                    logger.error(f"发送账号下线 Webhook 异常 [{phone}]: {e}")
+            else:
+                logger.info("未配置账号下线 Webhook URL，跳过 Webhook 告警推送。")
+
+            # B. 触发 Bark 推送
+            offline_bark = config.get("offline_bark", {})
+            global_bark = config.get("global_bark", {})
+            bark_to_use = None
+            if offline_bark.get("is_enabled"):
+                bark_to_use = offline_bark
+                if not (bark_to_use.get("device_key") or "").strip():
+                    bark_to_use = {**offline_bark, "device_key": global_bark.get("device_key", "")}
+            elif global_bark.get("is_enabled") and offline_bark.get("is_enabled") is not False:
+                bark_to_use = {
+                    **global_bark,
+                    "group": offline_bark.get("group") or "账号告警",
+                    "sound": offline_bark.get("sound") or "alarm",
+                    "level": offline_bark.get("level") or "timeSensitive"
+                }
+
+            if bark_to_use and (bark_to_use.get("device_key") or "").strip():
+                asyncio.create_task(send_bark_push(
+                    bark_config=bark_to_use,
+                    title="⚠️ Telegram 账号离线告警",
+                    body=f"Telegram 账号 [{phone}] 已离线/需重新登录！\n原因：{reason}",
+                    placeholder_data=placeholder_data,
+                    default_group="账号告警",
+                    default_sound="alarm",
+                    default_level="timeSensitive"
+                ))
         except Exception as e:
             logger.error(f"发送账号下线 Webhook 告警失败 [{phone}]: {e}")
 
@@ -613,6 +786,37 @@ class TelegramManager:
                     placeholder_data=placeholder_data,
                     chat_type=chat_type,
                     custom_body=webhook_custom_body
+                ))
+
+            # 6. 异步运行 Bark 推送任务
+            global_bark = config.get("global_bark", {})
+            rule_bark = rule.get("bark", {})
+            active_bark = None
+            if rule_bark.get("is_enabled"):
+                active_bark = {
+                    "device_key": rule_bark.get("device_key") or global_bark.get("device_key", ""),
+                    "server_url": rule_bark.get("server_url") or global_bark.get("server_url", "https://api.day.app"),
+                    "group": rule_bark.get("group") or global_bark.get("group") or rule.get("name", "TG监控"),
+                    "sound": rule_bark.get("sound") or global_bark.get("sound", ""),
+                    "icon": rule_bark.get("icon") or global_bark.get("icon", ""),
+                    "level": rule_bark.get("level") or global_bark.get("level", "active"),
+                    "url": rule_bark.get("url") or global_bark.get("url", ""),
+                    "timeout": global_bark.get("timeout", 10),
+                    "is_archive": global_bark.get("is_archive", 1)
+                }
+            elif global_bark.get("is_enabled"):
+                active_bark = global_bark
+
+            if active_bark and (active_bark.get("device_key") or "").strip():
+                bark_title = f"【{rule.get('name', 'TG监控')}】{chat_title} - {sender_name}"
+                asyncio.create_task(send_bark_push(
+                    bark_config=active_bark,
+                    title=bark_title,
+                    body=message_text,
+                    placeholder_data=placeholder_data,
+                    default_group=rule.get("name", "TG监控"),
+                    default_sound="",
+                    default_level="active"
                 ))
 
     async def is_target_match(self, event, chat, sender, targets: List[str]) -> bool:
@@ -841,7 +1045,7 @@ class TodoManager:
             await asyncio.sleep(10)
 
     async def trigger_todo_webhook(self, todo: dict, is_retry: bool = False):
-        """触发待办提醒 Webhook"""
+        """触发待办提醒 Webhook & Bark 通知"""
         config = await self.config_manager.get_config()
         default_todo_webhook = config.get("todo_webhook", {})
         todo_custom_webhook = todo.get("webhook", {})
@@ -856,10 +1060,6 @@ class TodoManager:
             timeout = default_todo_webhook.get("timeout", 10)
             method = todo_custom_webhook.get("method") or default_todo_webhook.get("method") or "POST"
             custom_body = todo_custom_webhook.get("custom_body", "")
-
-        if not url:
-            logger.warning(f"待办 [{todo.get('title')}] 触发提醒，但未配置待办 Webhook URL，跳过发送。")
-            return
 
         now_str = format_datetime()
         title = todo.get("title", "")
@@ -887,38 +1087,74 @@ class TodoManager:
             "text": text
         }
 
-        final_url = resolve_placeholders(url, placeholder_data, method)
-        logger.info(f"正在发送待办提醒 Webhook [{title}] (is_retry={is_retry}) 到 {final_url}...")
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                if method.upper() == "GET":
-                    resp = await client.get(final_url)
-                else:
-                    if custom_body and custom_body.strip():
-                        resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
-                        try:
-                            payload = json.loads(resolved_body)
-                            resp = await client.post(final_url, json=payload)
-                        except json.JSONDecodeError:
-                            headers = {"Content-Type": "application/json"}
-                            resp = await client.post(final_url, content=resolved_body, headers=headers)
+        # A. 触发 Webhook 推送
+        if url:
+            final_url = resolve_placeholders(url, placeholder_data, method)
+            logger.info(f"正在发送待办提醒 Webhook [{title}] (is_retry={is_retry}) 到 {final_url}...")
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    if method.upper() == "GET":
+                        resp = await client.get(final_url)
                     else:
-                        payload = {
-                            "event": "todo_reminder",
-                            "is_retry": is_retry,
-                            "todo_id": todo.get("id"),
-                            "title": title,
-                            "content": content,
-                            "target_date": target_date,
-                            "confirm_type": todo.get("confirm_type", "auto"),
-                            "is_recurring": todo.get("is_recurring", False),
-                            "trigger_time": now_str,
-                            "message": text
-                        }
-                        resp = await client.post(final_url, json=payload)
-                logger.info(f"待办 Webhook 推送完成 [{title}], 状态码: {resp.status_code}")
-        except Exception as e:
-            logger.error(f"发送待办 Webhook 失败 [{title}]: {e}")
+                        if custom_body and custom_body.strip():
+                            resolved_body = resolve_placeholders(custom_body, placeholder_data, method)
+                            try:
+                                payload = json.loads(resolved_body)
+                                resp = await client.post(final_url, json=payload)
+                            except json.JSONDecodeError:
+                                headers = {"Content-Type": "application/json"}
+                                resp = await client.post(final_url, content=resolved_body, headers=headers)
+                        else:
+                            payload = {
+                                "event": "todo_reminder",
+                                "is_retry": is_retry,
+                                "todo_id": todo.get("id"),
+                                "title": title,
+                                "content": content,
+                                "target_date": target_date,
+                                "confirm_type": todo.get("confirm_type", "auto"),
+                                "is_recurring": todo.get("is_recurring", False),
+                                "trigger_time": now_str,
+                                "message": text
+                            }
+                            resp = await client.post(final_url, json=payload)
+                    logger.info(f"待办 Webhook 推送完成 [{title}], 状态码: {resp.status_code}")
+            except Exception as e:
+                logger.error(f"发送待办 Webhook 失败 [{title}]: {e}")
+        else:
+            logger.info(f"待办 [{title}] 未配置 Webhook URL，跳过 Webhook 发送。")
+
+        # B. 触发 Bark 推送
+        todo_bark_default = config.get("todo_bark", {})
+        todo_bark_custom = todo.get("bark", {})
+        active_bark = None
+        if todo_bark_custom.get("is_enabled"):
+            active_bark = {
+                "device_key": todo_bark_custom.get("device_key") or todo_bark_default.get("device_key", ""),
+                "server_url": todo_bark_custom.get("server_url") or todo_bark_default.get("server_url", "https://api.day.app"),
+                "group": todo_bark_custom.get("group") or todo_bark_default.get("group") or "定时待办",
+                "sound": todo_bark_custom.get("sound") or todo_bark_default.get("sound", "alarm"),
+                "icon": todo_bark_custom.get("icon") or todo_bark_default.get("icon", ""),
+                "level": todo_bark_custom.get("level") or todo_bark_default.get("level", "timeSensitive"),
+                "url": todo_bark_custom.get("url") or todo_bark_default.get("url", ""),
+                "timeout": todo_bark_default.get("timeout", 10),
+                "is_archive": todo_bark_default.get("is_archive", 1)
+            }
+        elif todo_bark_default.get("is_enabled"):
+            active_bark = todo_bark_default
+
+        if active_bark and (active_bark.get("device_key") or "").strip():
+            bark_title = f"⏰ 待办到期：{title}" if not is_retry else f"🔔 待办催办：{title}"
+            bark_body = f"到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+            asyncio.create_task(send_bark_push(
+                bark_config=active_bark,
+                title=bark_title,
+                body=bark_body,
+                placeholder_data=placeholder_data,
+                default_group="定时待办",
+                default_sound="alarm",
+                default_level="timeSensitive"
+            ))
 
     async def check_and_trigger_todos(self):
         config = await self.config_manager.get_config()
@@ -1373,6 +1609,81 @@ async def update_todo_webhook_config(webhook_conf: TodoWebhookConfig):
     await config_manager.save_config(config)
     return {"status": "success", "message": "定时待办全局 Webhook 配置已更新。"}
 
+# --- 全局 Bark 配置 API ---
+
+@app.get("/api/config/global-bark", dependencies=[Depends(verify_token)])
+async def get_global_bark_config():
+    config = await config_manager.get_config()
+    return config.get("global_bark", {
+        "is_enabled": False,
+        "server_url": "https://api.day.app",
+        "device_key": "",
+        "group": "TG监控",
+        "sound": "",
+        "icon": "",
+        "level": "active",
+        "is_archive": 1,
+        "url": "",
+        "timeout": 10
+    })
+
+@app.post("/api/config/global-bark", dependencies=[Depends(verify_token)])
+async def update_global_bark_config(bark_conf: BarkConfig):
+    config = await config_manager.get_config()
+    config["global_bark"] = bark_conf.dict()
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "全局 Bark 推送配置已更新。"}
+
+# --- 账号下线 Bark 配置 API ---
+
+@app.get("/api/config/offline-bark", dependencies=[Depends(verify_token)])
+async def get_offline_bark_config():
+    config = await config_manager.get_config()
+    return config.get("offline_bark", {
+        "is_enabled": False,
+        "server_url": "https://api.day.app",
+        "device_key": "",
+        "group": "账号告警",
+        "sound": "alarm",
+        "icon": "",
+        "level": "timeSensitive",
+        "is_archive": 1,
+        "url": "",
+        "timeout": 10
+    })
+
+@app.post("/api/config/offline-bark", dependencies=[Depends(verify_token)])
+async def update_offline_bark_config(bark_conf: BarkConfig):
+    config = await config_manager.get_config()
+    config["offline_bark"] = bark_conf.dict()
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "账号下线 Bark 告警配置已更新。"}
+
+# --- 定时待办 Bark 配置 API ---
+
+@app.get("/api/config/todo-bark", dependencies=[Depends(verify_token)])
+async def get_todo_bark_config():
+    config = await config_manager.get_config()
+    return config.get("todo_bark", {
+        "is_enabled": False,
+        "server_url": "https://api.day.app",
+        "device_key": "",
+        "group": "定时待办",
+        "sound": "alarm",
+        "icon": "",
+        "level": "timeSensitive",
+        "is_archive": 1,
+        "url": "",
+        "timeout": 10
+    })
+
+@app.post("/api/config/todo-bark", dependencies=[Depends(verify_token)])
+async def update_todo_bark_config(bark_conf: BarkConfig):
+    config = await config_manager.get_config()
+    config["todo_bark"] = bark_conf.dict()
+    await config_manager.save_config(config)
+    return {"status": "success", "message": "定时待办默认 Bark 推送配置已更新。"}
+
 # --- Webhook 测试联调 API ---
 
 class TestWebhookReq(BaseModel):
@@ -1511,6 +1822,122 @@ async def test_webhook(req: TestWebhookReq):
             "status": "error",
             "elapsed_ms": elapsed,
             "error": str(e)
+        }
+
+# --- Bark 测试联调 API ---
+
+class TestBarkReq(BaseModel):
+    device_key: str
+    server_url: str = "https://api.day.app"
+    group: str = ""
+    sound: str = ""
+    icon: str = ""
+    level: str = "active"
+    url: str = ""
+    event_type: str = "message"  # "message" / "account_offline" / "todo_reminder"
+
+@app.post("/api/bark/test", dependencies=[Depends(verify_token)])
+async def test_bark(req: TestBarkReq):
+    raw_key = req.device_key.strip()
+    srv_url = req.server_url.strip() or "https://api.day.app"
+    server_url, device_key = extract_bark_info(raw_key, srv_url)
+
+    if not device_key:
+        raise HTTPException(status_code=400, detail="Bark Device Key 不能为空。")
+
+    now_str = format_datetime()
+    if req.event_type == "account_offline":
+        mock_placeholders = {
+            "event": "account_offline",
+            "receiver_account": "+15407800413",
+            "phone": "+15407800413",
+            "reason": "Session 已失效或在其他设备已注销 (Bark联调测试)",
+            "date": now_str,
+            "text": "【账号下线告警】Telegram 账号 [+15407800413] 已离线/需重新登录！原因：Session 已失效 (Bark联调测试)"
+        }
+        title = "⚠️ Telegram 账号离线告警"
+        body = "Telegram 账号 [+15407800413] 已离线/需重新登录！\n原因：Session 已失效 (Bark联调测试)"
+        default_group = "账号告警"
+        default_sound = "alarm"
+        default_level = "timeSensitive"
+    elif req.event_type == "todo_reminder":
+        mock_placeholders = {
+            "event": "todo_reminder",
+            "todo_id": "mock_todo_test",
+            "title": "测试待办任务事项",
+            "content": "这是一条来自待办 Bark 测试按钮的模拟测试内容。",
+            "target_date": now_str,
+            "due_date": now_str,
+            "date": now_str,
+            "confirm_type": "手动确认",
+            "is_recurring": "单次执行",
+            "status": "pending",
+            "text": f"【待办提醒】您的待办任务「测试待办任务事项」已到期！\n到期时间：{now_str}\n确认方式：手动确认\n任务内容：这是一条来自待办 Bark 测试按钮的模拟测试内容。"
+        }
+        title = "⏰ 待办到期：测试待办任务事项"
+        body = f"到期时间：{now_str}\n确认方式：手动确认\n任务内容：这是一条来自待办 Bark 测试按钮的模拟测试内容。"
+        default_group = "定时待办"
+        default_sound = "alarm"
+        default_level = "timeSensitive"
+    else:
+        mock_placeholders = {
+            "text": "这是一条来自 Bark 测试按钮的模拟 Telegram 消息内容。",
+            "msg_id": 99999,
+            "date": now_str,
+            "sender_id": 12345678,
+            "sender_username": "test_sender",
+            "sender_name": "测试发送人",
+            "chat_id": -100123456,
+            "chat_title": "测试监控群组",
+            "chat_username": "test_group",
+            "receiver_account": "+8613800000000",
+            "phone": "+8613800000000",
+            "rule_name": "测试规则",
+            "matched_keywords": "测试,Bark"
+        }
+        title = "【TG监控】测试监控群组 - 测试发送人"
+        body = "这是一条来自 Bark 测试按钮的模拟 Telegram 消息内容。"
+        default_group = "TG监控"
+        default_sound = ""
+        default_level = "active"
+
+    bark_conf = {
+        "device_key": device_key,
+        "server_url": server_url,
+        "group": req.group or default_group,
+        "sound": req.sound or default_sound,
+        "icon": req.icon,
+        "level": req.level or default_level,
+        "url": req.url,
+        "timeout": 10
+    }
+
+    result = await send_bark_push(
+        bark_config=bark_conf,
+        title=title,
+        body=body,
+        placeholder_data=mock_placeholders,
+        default_group=default_group,
+        default_sound=default_sound,
+        default_level=default_level
+    )
+
+    if result["status"] == "success":
+        return {
+            "status": "success",
+            "status_code": result["code"],
+            "elapsed_ms": result["elapsed"],
+            "response": result["response"],
+            "message": "Bark 推送请求已成功发送并被服务器受理。"
+        }
+    else:
+        return {
+            "status": "error",
+            "status_code": result["code"],
+            "elapsed_ms": result["elapsed"],
+            "response": result["response"],
+            "error": result["error"],
+            "message": f"Bark 推送失败: {result['error']}"
         }
 
 # --- 规则管理 API ---

@@ -224,12 +224,12 @@
           </div>
         </div>
 
-        <!-- 全局配置面板 -->
-        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
-          <div class="flex items-center justify-between mb-6">
+        <!-- 全局通知渠道配置面板 (Webhook & Bark) -->
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between mb-2">
             <div class="flex items-center space-x-2">
               <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
-              <h2 class="text-md font-bold text-white" x-text="t('card_webhook')"></h2>
+              <h2 class="text-md font-bold text-white" x-text="t('card_global_channels')"></h2>
             </div>
             <!-- 帮助问号说明链接按钮 -->
             <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
@@ -237,10 +237,24 @@
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
             </button>
           </div>
-          <div class="space-y-4">
+
+          <!-- 渠道切换 Tab (Webhook / Bark) -->
+          <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
+            <button type="button" @click="tgChannelTab = 'webhook'; $nextTick(() => lucide.createIcons());" :class="tgChannelTab === 'webhook' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+              <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+              <span x-text="t('channel_webhook')"></span>
+            </button>
+            <button type="button" @click="tgChannelTab = 'bark'; $nextTick(() => lucide.createIcons());" :class="tgChannelTab === 'bark' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+              <span x-text="t('channel_bark')"></span>
+            </button>
+          </div>
+
+          <!-- Webhook 渠道表单 -->
+          <div x-show="tgChannelTab === 'webhook'" class="space-y-4 pt-1">
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
-              <input type="url" x-model="globalWebhook.url" placeholder="https://api.example.com/webhook" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition">
+              <input type="url" x-model="globalWebhook.url" placeholder="https://api.example.com/webhook" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
               <p class="text-[11px] text-gray-500 mt-1" x-text="t('webhook_hint')"></p>
             </div>
             <div>
@@ -257,9 +271,9 @@
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_timeout')"></label>
-              <input type="number" x-model.number="globalWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition">
+              <input type="number" x-model.number="globalWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4 pt-2">
               <button type="button" @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
                 <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingWebhook"></i>
                 <span x-show="!testingWebhook" x-text="t('btn_test_conn')"></span>
@@ -271,18 +285,102 @@
               </button>
             </div>
           </div>
+
+          <!-- Bark 渠道表单 -->
+          <div x-show="tgChannelTab === 'bark'" class="space-y-4 pt-1">
+            <!-- 启用开关 -->
+            <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+              <div>
+                <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_bark_enabled')"></span>
+                <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '开启后匹配到的消息将实时推送到 iOS / macOS 客户端' : 'Push matched TG messages directly to Bark iOS/macOS'"></span>
+              </div>
+              <button type="button" @click="globalBark.is_enabled = !globalBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                      :class="globalBark.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+                <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                     :class="globalBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+              </button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                <span class="text-red-400 mr-1">*</span><span x-text="t('lbl_bark_key')"></span>
+              </label>
+              <input type="text" x-model="globalBark.device_key" :placeholder="t('ph_bark_key')" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
+              <p class="text-[11px] text-gray-500 mt-1" x-text="t('bark_key_hint')"></p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_sound')"></label>
+                <select x-model="globalBark.sound" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <template x-for="s in barkSounds" :key="s.id">
+                    <option :value="s.id" x-text="s.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_level')"></label>
+                <select x-model="globalBark.level" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <template x-for="lvl in barkLevels" :key="lvl.id">
+                    <option :value="lvl.id" x-text="lvl.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_group')"></label>
+                <input type="text" x-model="globalBark.group" placeholder="TG监控" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_server')"></label>
+                <input type="url" x-model="globalBark.server_url" placeholder="https://api.day.app" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono transition">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_jump_url')"></label>
+              <input type="text" x-model="globalBark.url" placeholder="https://t.me/..." class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-2">
+              <button type="button" @click="testBark('global')" :disabled="testingBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingBark"></i>
+                <span x-show="!testingBark" x-text="t('btn_test_bark')"></span>
+                <span x-show="testingBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+              <button type="button" @click="saveGlobalBark()" :disabled="savingGlobalBark" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="save" class="w-4 h-4" x-show="!savingGlobalBark"></i>
+                <span x-show="!savingGlobalBark" x-text="t('btn_save_bark')"></span>
+                <span x-show="savingGlobalBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- 账号下线告警 Webhook 配置 -->
+        <!-- 账号下线告警通知渠道配置 (Webhook & Bark) -->
         <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between mb-1">
+          <div class="flex items-center justify-between mb-2">
             <div class="flex items-center space-x-2">
               <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
-              <h2 class="text-md font-bold text-white" x-text="t('card_offline_webhook')"></h2>
+              <h2 class="text-md font-bold text-white" x-text="t('card_offline_channels')"></h2>
             </div>
             <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-amber-600/20 text-amber-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
               <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
+            </button>
+          </div>
+
+          <!-- 渠道切换 Tab (Webhook / Bark) -->
+          <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
+            <button type="button" @click="offlineChannelTab = 'webhook'; $nextTick(() => lucide.createIcons());" :class="offlineChannelTab === 'webhook' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+              <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+              <span x-text="lang === 'zh' ? 'Webhook 告警' : 'Webhook Alert'"></span>
+            </button>
+            <button type="button" @click="offlineChannelTab = 'bark'; $nextTick(() => lucide.createIcons());" :class="offlineChannelTab === 'bark' ? 'bg-amber-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+              <span x-text="lang === 'zh' ? 'Bark 告警' : 'Bark Alert'"></span>
             </button>
           </div>
           
@@ -305,10 +403,11 @@
             </div>
           </div>
 
-          <div class="space-y-4">
+          <!-- Webhook 告警表单 -->
+          <div x-show="offlineChannelTab === 'webhook'" class="space-y-4 pt-1">
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
-              <input type="url" x-model="offlineWebhook.url" placeholder="https://api.example.com/offline-webhook?phone={phone}&reason={reason}" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm transition">
+              <input type="url" x-model="offlineWebhook.url" placeholder="https://api.example.com/offline-webhook?phone={phone}&reason={reason}" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
               <p class="text-[11px] text-gray-500 mt-1" x-text="t('offline_webhook_hint')"></p>
             </div>
             <div>
@@ -322,7 +421,7 @@
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_custom_body')"></label>
               <textarea x-model="offlineWebhook.custom_body" rows="3" placeholder='{"event": "account_offline", "phone": "{phone}", "reason": "{reason}", "date": "{date}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4 pt-2">
               <button type="button" @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
                 <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineWebhook"></i>
                 <span x-show="!testingOfflineWebhook" x-text="t('btn_test_conn')"></span>
@@ -331,6 +430,69 @@
               <button type="button" @click="saveOfflineWebhook()" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
                 <i data-lucide="save" class="w-4 h-4"></i>
                 <span x-text="t('btn_save_config')"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bark 告警表单 -->
+          <div x-show="offlineChannelTab === 'bark'" class="space-y-4 pt-1">
+            <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+              <div>
+                <span class="text-xs font-semibold text-gray-200 block" x-text="lang === 'zh' ? '启用 Bark 离线告警' : 'Enable Offline Bark Alert'"></span>
+                <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '当账号离线/失效时立即向 Bark 发送时效性告警' : 'Push high-priority alert to Bark when TG account goes offline'"></span>
+              </div>
+              <button type="button" @click="offlineBark.is_enabled = !offlineBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                      :class="offlineBark.is_enabled ? 'bg-amber-600' : 'bg-gray-700'">
+                <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                     :class="offlineBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+              </button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_key')"></label>
+              <input type="text" x-model="offlineBark.device_key" :placeholder="lang === 'zh' ? '留空则自动继承全局 Bark Key / URL' : 'Inherit Global Bark Key if empty...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_sound')"></label>
+                <select x-model="offlineBark.sound" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <template x-for="s in barkSounds" :key="s.id">
+                    <option :value="s.id" x-text="s.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_level')"></label>
+                <select x-model="offlineBark.level" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <template x-for="lvl in barkLevels" :key="lvl.id">
+                    <option :value="lvl.id" x-text="lvl.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_group')"></label>
+                <input type="text" x-model="offlineBark.group" placeholder="账号告警" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white transition">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_server')"></label>
+                <input type="url" x-model="offlineBark.server_url" placeholder="https://api.day.app" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white font-mono transition">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-2">
+              <button type="button" @click="testBark('offline')" :disabled="testingOfflineBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineBark"></i>
+                <span x-show="!testingOfflineBark" x-text="lang === 'zh' ? '测试 Bark 告警' : 'Test Bark Alert'"></span>
+                <span x-show="testingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+              <button type="button" @click="saveOfflineBark()" :disabled="savingOfflineBark" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="save" class="w-4 h-4" x-show="!savingOfflineBark"></i>
+                <span x-show="!savingOfflineBark" x-text="t('btn_save_bark')"></span>
+                <span x-show="savingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
             </div>
           </div>
@@ -481,14 +643,26 @@
                   </div>
                 </div>
 
-                <!-- 专属 Webhook 与防抖展示 -->
+                <!-- 专属 Webhook 与 Bark 与防抖展示 -->
                 <div class="mt-3 flex items-center justify-between text-xs text-gray-400 pl-1 flex-wrap gap-2">
-                  <div class="flex items-center space-x-1.5 truncate max-w-md">
-                    <i data-lucide="link" class="w-3.5 h-3.5 text-gray-500"></i>
-                    <span>Webhook:</span>
-                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="rule.webhook.url ? (rule.webhook.method || 'POST') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
-                    <span class="truncate text-indigo-300 font-mono" x-text="rule.webhook.url || (lang === 'zh' ? '使用全局 Webhook URL' : 'Using Global Webhook')"></span>
+                  <div class="flex items-center space-x-4 flex-wrap gap-y-1">
+                    <div class="flex items-center space-x-1.5 truncate max-w-md">
+                      <i data-lucide="link" class="w-3.5 h-3.5 text-gray-500"></i>
+                      <span>Webhook:</span>
+                      <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="rule.webhook.url ? (rule.webhook.method || 'POST') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
+                      <span class="truncate text-indigo-300 font-mono" x-text="rule.webhook.url || (lang === 'zh' ? '使用全局 Webhook URL' : 'Using Global Webhook')"></span>
+                    </div>
+
+                    <template x-if="rule.bark && rule.bark.is_enabled">
+                      <div class="flex items-center space-x-1.5 truncate max-w-xs">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-400"></i>
+                        <span>Bark:</span>
+                        <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="rule.bark.sound || (lang === 'zh' ? '默认铃声' : 'Default')"></span>
+                        <span class="truncate text-purple-300 font-mono" x-text="rule.bark.device_key ? (lang === 'zh' ? '专属 Key' : 'Dedicated Key') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
+                      </div>
+                    </template>
                   </div>
+
                   <template x-if="rule.debounce_seconds && rule.debounce_seconds > 0">
                     <span class="inline-flex items-center justify-center px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-medium leading-none space-x-1" :title="lang === 'zh' ? '防抖冷却：触发一次后防抖期内不发送，新消息会重置防抖时间' : 'Debounce enabled'">
                       <i data-lucide="timer" class="w-3 h-3"></i>
@@ -562,17 +736,29 @@
       <!-- 待办控制台主体内容网格 (左侧：独立待办 Webhook，右侧：待办任务列表) -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
-        <!-- 左栏：定时待办独立全局 Webhook 配置 (1/3 宽度) -->
+        <!-- 左栏：定时待办默认通知渠道配置 (Webhook & Bark) (1/3 宽度) -->
         <div class="lg:col-span-1 space-y-6">
           <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center space-x-2">
                 <i data-lucide="bell" class="w-5 h-5 text-indigo-400"></i>
-                <h2 class="text-md font-bold text-white" x-text="t('card_todo_webhook')"></h2>
+                <h2 class="text-md font-bold text-white" x-text="t('card_todo_channels')"></h2>
               </div>
               <button type="button" @click="openHelpModal('todo')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
                 <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
                 <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
+              </button>
+            </div>
+
+            <!-- 渠道切换 Tab (Webhook / Bark) -->
+            <div class="flex items-center bg-brand-dark p-1 rounded-xl border border-brand-border text-xs">
+              <button type="button" @click="todoChannelTab = 'webhook'; $nextTick(() => lucide.createIcons());" :class="todoChannelTab === 'webhook' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+                <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+                <span x-text="t('channel_webhook')"></span>
+              </button>
+              <button type="button" @click="todoChannelTab = 'bark'; $nextTick(() => lucide.createIcons());" :class="todoChannelTab === 'bark' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'" class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center space-x-1.5">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                <span x-text="t('channel_bark')"></span>
               </button>
             </div>
 
@@ -600,7 +786,8 @@
               </div>
             </div>
 
-            <div class="space-y-4">
+            <!-- Webhook 表单 -->
+            <div x-show="todoChannelTab === 'webhook'" class="space-y-4 pt-1">
               <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_todo_default_url')"></label>
                 <input type="url" x-model="todoWebhook.url" placeholder="https://api.example.com/todo-webhook?title={title}&date={due_date}" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition text-white font-mono">
@@ -620,7 +807,7 @@
                 <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_timeout')"></label>
                 <input type="number" x-model.number="todoWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-2 gap-4 pt-2">
                 <button type="button" @click="testWebhook('todo')" :disabled="testingTodoWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
                   <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingTodoWebhook"></i>
                   <span x-show="!testingTodoWebhook" x-text="t('btn_test_conn')"></span>
@@ -630,6 +817,76 @@
                   <i data-lucide="save" class="w-4 h-4" x-show="!savingTodoWebhook"></i>
                   <span x-show="!savingTodoWebhook" x-text="t('btn_save_config')"></span>
                   <span x-show="savingTodoWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Bark 表单 -->
+            <div x-show="todoChannelTab === 'bark'" class="space-y-4 pt-1">
+              <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+                <div>
+                  <span class="text-xs font-semibold text-gray-200 block" x-text="lang === 'zh' ? '启用待办 Bark 默认提醒' : 'Enable Todo Default Bark Alert'"></span>
+                  <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '待办到期或催办时默认向 Bark 发送通知提醒' : 'Push alerts to Bark when scheduled todos are due'"></span>
+                </div>
+                <button type="button" @click="todoBark.is_enabled = !todoBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                        :class="todoBark.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+                  <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                       :class="todoBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+                </button>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  <span class="text-red-400 mr-1">*</span><span x-text="t('lbl_bark_key')"></span>
+                </label>
+                <input type="text" x-model="todoBark.device_key" :placeholder="lang === 'zh' ? '留空则自动继承全局 Bark Key / URL' : 'Inherit Global Bark Key if empty...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_sound')"></label>
+                  <select x-model="todoBark.sound" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                    <template x-for="s in barkSounds" :key="s.id">
+                      <option :value="s.id" x-text="s.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_level')"></label>
+                  <select x-model="todoBark.level" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                    <template x-for="lvl in barkLevels" :key="lvl.id">
+                      <option :value="lvl.id" x-text="lvl.name"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_group')"></label>
+                  <input type="text" x-model="todoBark.group" placeholder="定时待办" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_server')"></label>
+                  <input type="url" x-model="todoBark.server_url" placeholder="https://api.day.app" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono transition">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_jump_url')"></label>
+                <input type="text" x-model="todoBark.url" placeholder="https://..." class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 pt-2">
+                <button type="button" @click="testBark('todo')" :disabled="testingTodoBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingTodoBark"></i>
+                  <span x-show="!testingTodoBark" x-text="lang === 'zh' ? '测试待办 Bark' : 'Test Todo Bark'"></span>
+                  <span x-show="testingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                </button>
+                <button type="button" @click="saveTodoBark()" :disabled="savingTodoBark" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="save" class="w-4 h-4" x-show="!savingTodoBark"></i>
+                  <span x-show="!savingTodoBark" x-text="t('btn_save_bark')"></span>
+                  <span x-show="savingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                 </button>
               </div>
             </div>
@@ -811,7 +1068,7 @@
                   </div>
                 </div>
 
-                <!-- Webhook 与时间记录 -->
+                <!-- Webhook, Bark 与时间记录 -->
                 <div class="space-y-1.5">
                   <div class="flex items-center space-x-2 text-gray-400 truncate">
                     <i data-lucide="link" class="w-4 h-4 text-indigo-400 shrink-0"></i>
@@ -819,6 +1076,14 @@
                     <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="todo.webhook && todo.webhook.url ? (todo.webhook.method || 'POST') : (lang === 'zh' ? '待办默认' : 'Todo Default')"></span>
                     <span class="truncate text-indigo-300 font-mono" x-text="(todo.webhook && todo.webhook.url) ? todo.webhook.url : (todoWebhook.url || (lang === 'zh' ? '未配置待办默认 Webhook' : 'No Todo Webhook'))"></span>
                   </div>
+                  <template x-if="todo.bark && todo.bark.is_enabled">
+                    <div class="flex items-center space-x-2 text-gray-400 truncate">
+                      <i data-lucide="smartphone" class="w-4 h-4 text-purple-400 shrink-0"></i>
+                      <span class="font-medium shrink-0">Bark:</span>
+                      <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="todo.bark.sound || (lang === 'zh' ? '默认铃声' : 'Default')"></span>
+                      <span class="truncate text-purple-300 font-mono" x-text="todo.bark.device_key ? (lang === 'zh' ? '专属 Key' : 'Dedicated Key') : (todoBark.device_key || globalBark.device_key ? (lang === 'zh' ? '待办默认' : 'Todo Default') : (lang === 'zh' ? '未配置' : 'Not Configured'))"></span>
+                    </div>
+                  </template>
                   <div class="flex items-center space-x-4 text-gray-500 text-[11px]">
                     <span x-show="todo.created_at" x-text="t('lbl_created_at') + ': ' + todo.created_at"></span>
                     <span x-show="todo.last_trigger_time" x-text="t('lbl_last_trigger') + ': ' + todo.last_trigger_time"></span>
@@ -1121,6 +1386,68 @@
                 <i data-lucide="play" class="w-3.5 h-3.5 text-indigo-400" x-show="!testingWebhook"></i>
                 <span x-show="!testingWebhook" x-text="t('btn_test_dedicated')"></span>
                 <span x-show="testingWebhook" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 覆盖 Bark 推送 -->
+        <div class="border-t border-brand-border pt-4">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span class="text-xs font-semibold text-gray-300 block" x-text="t('lbl_override_bark')"></span>
+              <span class="text-[10px] text-gray-500" x-text="t('override_bark_hint')"></span>
+            </div>
+            <button type="button" @click="ruleForm.overrideBark = !ruleForm.overrideBark" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                    :class="ruleForm.overrideBark ? 'bg-indigo-600' : 'bg-gray-700'">
+              <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                   :class="ruleForm.overrideBark ? 'translate-x-4' : 'translate-x-0'"></div>
+            </button>
+          </div>
+          <div x-show="ruleForm.overrideBark" x-cloak class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_key')"></label>
+              <input type="text" x-model="ruleForm.bark.device_key" :placeholder="lang === 'zh' ? '留空则使用全局 Bark Key / URL' : 'Inherit Global Bark Key if empty...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_sound')"></label>
+                <select x-model="ruleForm.bark.sound" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <template x-for="s in barkSounds" :key="s.id">
+                    <option :value="s.id" x-text="s.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_level')"></label>
+                <select x-model="ruleForm.bark.level" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white transition bg-brand-dark">
+                  <option value="" x-text="lang === 'zh' ? '继承全局级别' : 'Inherit Global Level'"></option>
+                  <template x-for="lvl in barkLevels" :key="lvl.id">
+                    <option :value="lvl.id" x-text="lvl.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_group')"></label>
+                <input type="text" x-model="ruleForm.bark.group" placeholder="TG监控" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_server')"></label>
+                <input type="url" x-model="ruleForm.bark.server_url" placeholder="https://api.day.app" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_bark_jump_url')"></label>
+              <input type="text" x-model="ruleForm.bark.url" placeholder="https://t.me/..." class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+            <!-- 测试此专属 Bark 按钮 -->
+            <div class="flex justify-end pt-1">
+              <button type="button" @click="testBark('rule')" :disabled="testingBark" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg transition text-xs flex items-center space-x-1.5 disabled:opacity-50 shadow-sm">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-indigo-400" x-show="!testingBark"></i>
+                <span x-show="!testingBark" x-text="lang === 'zh' ? '测试专属 Bark' : 'Test Custom Bark'"></span>
+                <span x-show="testingBark" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
             </div>
           </div>
@@ -1583,6 +1910,70 @@
             </div>
           </div>
         </div>
+
+        <!-- 专属 Bark 覆盖配置 -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" x-model="todoForm.overrideBark" class="rounded bg-brand-dark border-brand-border text-indigo-600 focus:ring-0">
+                <span class="text-xs font-semibold text-gray-300" x-text="t('lbl_override_bark')"></span>
+              </label>
+              <p class="text-[10px] text-gray-500 mt-0.5 ml-5" x-text="t('override_bark_hint')"></p>
+            </div>
+          </div>
+
+          <div x-show="todoForm.overrideBark" class="space-y-3 pt-2">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_key')"></label>
+              <input type="text" x-model="todoForm.bark.device_key" :placeholder="lang === 'zh' ? '留空则使用待办默认 / 全局 Bark Key' : 'Inherit Todo Default Bark Key if empty...'" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_sound')"></label>
+                <select x-model="todoForm.bark.sound" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white">
+                  <template x-for="s in barkSounds" :key="s.id">
+                    <option :value="s.id" x-text="s.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_level')"></label>
+                <select x-model="todoForm.bark.level" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white">
+                  <option value="" x-text="lang === 'zh' ? '继承默认级别' : 'Inherit Default Level'"></option>
+                  <template x-for="lvl in barkLevels" :key="lvl.id">
+                    <option :value="lvl.id" x-text="lvl.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_group')"></label>
+                <input type="text" x-model="todoForm.bark.group" placeholder="定时待办" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_server')"></label>
+                <input type="url" x-model="todoForm.bark.server_url" placeholder="https://api.day.app" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-xs text-white font-mono">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_bark_jump_url')"></label>
+              <input type="text" x-model="todoForm.bark.url" placeholder="https://..." class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+            </div>
+
+            <div class="pt-1">
+              <button type="button" @click="testBark('todo_custom')" :disabled="testingTodoBark" class="px-3 py-1.5 bg-brand-dark hover:bg-brand-border text-indigo-400 hover:text-white rounded-lg text-xs font-semibold transition border border-brand-border flex items-center space-x-1.5 disabled:opacity-50">
+                <i data-lucide="play" class="w-3.5 h-3.5" x-show="!testingTodoBark"></i>
+                <span x-show="!testingTodoBark" x-text="lang === 'zh' ? '测试专属 Bark' : 'Test Custom Bark'"></span>
+                <span x-show="testingTodoBark" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 底部按纽 -->
@@ -1973,7 +2364,28 @@
             msg_already_latest: "当前运行的已是最新版本，无需更新！",
             lbl_last_checked: "上次检测时间",
             btn_recheck_update: "重新检测",
-            btn_start_update: "立即开始更新"
+            btn_start_update: "立即开始更新",
+            // Bark 通知渠道
+            channel_webhook: "Webhook (HTTP)",
+            channel_bark: "Bark (iOS / macOS)",
+            card_global_channels: "全局通知渠道配置",
+            card_offline_channels: "账号下线告警通知渠道",
+            card_todo_channels: "待办默认通知渠道",
+            lbl_bark_enabled: "启用 Bark 推送",
+            lbl_bark_key: "Bark Key / 推送 URL",
+            ph_bark_key: "输入 Device Key 或直接粘贴完整推送 URL (如 https://api.day.app/xxxx)...",
+            bark_key_hint: "支持直接填入 Key 或粘贴完整的 Bark 推送 URL，系统将自动识别解析。",
+            lbl_bark_server: "Bark 服务器地址",
+            lbl_bark_sound: "通知提示音 (Sound)",
+            lbl_bark_group: "消息分组 (Group)",
+            lbl_bark_level: "时效中断级别 (Level)",
+            lbl_bark_jump_url: "点击跳转链接 (URL, 可选)",
+            lbl_bark_icon: "自定义图标 URL (Icon, 可选)",
+            btn_test_bark: "测试 Bark 推送",
+            btn_save_bark: "保存 Bark 配置",
+            lbl_override_bark: "覆盖专属 Bark 推送",
+            override_bark_hint: "开启后可为此条目指定独立的 Bark Key、分组或提示铃声。",
+            modal_test_title_bark: "Bark 推送测试诊断结果"
           },
           en: {
             app_title: "TG Msg Monitor",
@@ -2166,12 +2578,31 @@
             tag_latest: "Latest",
             status_connecting_github: "Connecting to GitHub API to check latest commits...",
             status_updating_title: "Executing System Update & Recreation",
-            status_updating_desc: "Triggered update command. Container is pulling latest Docker image and recreating. Reconnecting automatically...",
-            lbl_update_log: "New Release Commit Log",
-            lbl_update_tip_title: "Active Update Notice",
+            msg_already_latest: "Already running the latest version!",
             lbl_last_checked: "Last Checked",
             btn_recheck_update: "Check Again",
-            btn_start_update: "Start Update Now"
+            btn_start_update: "Start Update Now",
+            // Bark Channels
+            channel_webhook: "Webhook (HTTP)",
+            channel_bark: "Bark (iOS / macOS)",
+            card_global_channels: "Global Notification Channels",
+            card_offline_channels: "Account Offline Alert Channels",
+            card_todo_channels: "Todo Default Notification Channels",
+            lbl_bark_enabled: "Enable Bark Push",
+            lbl_bark_key: "Bark Key / Push URL",
+            ph_bark_key: "Enter Device Key or paste full URL (e.g. https://api.day.app/xxxx)...",
+            bark_key_hint: "Supports entering Device Key or pasting full Bark push URL directly.",
+            lbl_bark_server: "Bark Server URL",
+            lbl_bark_sound: "Notification Sound (Sound)",
+            lbl_bark_group: "Message Group (Group)",
+            lbl_bark_level: "Interruption Level (Level)",
+            lbl_bark_jump_url: "Click Jump URL (Optional)",
+            lbl_bark_icon: "Custom Icon URL (Optional)",
+            btn_test_bark: "Test Bark Push",
+            btn_save_bark: "Save Bark Config",
+            lbl_override_bark: "Override Custom Bark Push",
+            override_bark_hint: "Enable to assign dedicated Bark Key, Group, or Sound for this item.",
+            modal_test_title_bark: "Bark Push Test Diagnostics"
           }
         },
         t(key) {
@@ -2194,8 +2625,55 @@
         globalWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
         offlineWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
         todoWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
+        
+        // Bark 通知渠道配置
+        globalBark: { is_enabled: false, server_url: "https://api.day.app", device_key: "", group: "TG监控", sound: "", icon: "", level: "active", is_archive: 1, url: "", timeout: 10 },
+        offlineBark: { is_enabled: false, server_url: "https://api.day.app", device_key: "", group: "账号告警", sound: "alarm", icon: "", level: "timeSensitive", is_archive: 1, url: "", timeout: 10 },
+        todoBark: { is_enabled: false, server_url: "https://api.day.app", device_key: "", group: "定时待办", sound: "alarm", icon: "", level: "timeSensitive", is_archive: 1, url: "", timeout: 10 },
+        
+        // 渠道切换 Tab
+        tgChannelTab: 'webhook', // 'webhook' | 'bark'
+        offlineChannelTab: 'webhook', // 'webhook' | 'bark'
+        todoChannelTab: 'webhook', // 'webhook' | 'bark'
+        
+        // 铃声与中断级别列表
+        barkSounds: [
+          { id: "", name: "默认铃声 (Default)" },
+          { id: "minuet", name: "minuet (轻快)" },
+          { id: "birdsong", name: "birdsong (鸟鸣)" },
+          { id: "alarm", name: "alarm (闹钟/强提醒)" },
+          { id: "chime", name: "chime (和弦钟声)" },
+          { id: "glass", name: "glass (清脆玻璃)" },
+          { id: "horn", name: "horn (警报喇叭)" },
+          { id: "telegraph", name: "telegraph (电报)" },
+          { id: "electronic", name: "electronic (电子音)" },
+          { id: "anticipate", name: "anticipate (期待)" },
+          { id: "bloom", name: "bloom (绽放)" },
+          { id: "calypso", name: "calypso (欢快)" },
+          { id: "choo_choo", name: "choo_choo (汽笛)" },
+          { id: "descent", name: "descent (下沉)" },
+          { id: "fanfare", name: "fanfare (号角)" },
+          { id: "ladder", name: "ladder (音阶)" },
+          { id: "news_flash", name: "news_flash (新闻快讯)" },
+          { id: "noir", name: "noir (低沉)" },
+          { id: "sherwood_forest", name: "sherwood_forest (森林)" },
+          { id: "silence", name: "silence (静音)" },
+          { id: "spell", name: "spell (魔幻)" },
+          { id: "suspense", name: "suspense (悬疑)" },
+          { id: "typewriters", name: "typewriters (打字机)" }
+        ],
+        barkLevels: [
+          { id: "active", name: "active (常规系统通知)" },
+          { id: "timeSensitive", name: "timeSensitive (时效性通知/锁屏停留)" },
+          { id: "passive", name: "passive (静默通知/仅通知中心)" },
+          { id: "critical", name: "critical (重要紧急警报)" }
+        ],
+
         refreshing: false,
         savingTodoWebhook: false,
+        savingGlobalBark: false,
+        savingOfflineBark: false,
+        savingTodoBark: false,
         
         // 帮助与诊断弹窗
         showHelpModal: false,
@@ -2204,6 +2682,9 @@
         testingWebhook: false,
         testingOfflineWebhook: false,
         testingTodoWebhook: false,
+        testingBark: false,
+        testingOfflineBark: false,
+        testingTodoBark: false,
         testResult: { status: "", code: null, elapsed: 0, response: "", error: "" },
         
         // 模态框开关
@@ -2251,7 +2732,18 @@
           overrideWebhook: false,
           webhookUrl: "",
           webhookMethod: "",
-          webhookCustomBody: ""
+          webhookCustomBody: "",
+          overrideBark: false,
+          bark: {
+            is_enabled: true,
+            server_url: "",
+            device_key: "",
+            group: "",
+            sound: "",
+            icon: "",
+            level: "active",
+            url: ""
+          }
         },
 
         // 待办参数表单
@@ -2272,7 +2764,18 @@
           overrideWebhook: false,
           webhookUrl: "",
           webhookMethod: "",
-          webhookCustomBody: ""
+          webhookCustomBody: "",
+          overrideBark: false,
+          bark: {
+            is_enabled: true,
+            server_url: "",
+            device_key: "",
+            group: "",
+            sound: "alarm",
+            icon: "",
+            level: "timeSensitive",
+            url: ""
+          }
         },
 
         // 系统版本与在线更新状态
@@ -2421,7 +2924,10 @@
               this.fetchTodos(),
               this.fetchWebhookConfig(),
               this.fetchOfflineWebhookConfig(),
-              this.fetchTodoWebhookConfig()
+              this.fetchTodoWebhookConfig(),
+              this.fetchGlobalBark(),
+              this.fetchOfflineBark(),
+              this.fetchTodoBark()
             ]);
             this.showToast(this.lang === 'zh' ? "数据加载成功" : "Data refreshed");
           } catch (e) {
@@ -2472,6 +2978,32 @@
           }
         },
 
+        async fetchGlobalBark() {
+          try {
+            const res = await this.apiFetch("/api/config/global-bark");
+            this.globalBark = await res.json();
+          } catch(e) {}
+        },
+
+        async saveGlobalBark() {
+          this.savingGlobalBark = true;
+          try {
+            const res = await this.apiFetch("/api/config/global-bark", {
+              method: "POST",
+              body: this.globalBark
+            });
+            if (res.ok) {
+              this.showToast(this.lang === 'zh' ? "全局 Bark 配置保存成功" : "Global Bark config saved");
+            } else {
+              this.showToast("保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败: " + e, "error");
+          } finally {
+            this.savingGlobalBark = false;
+          }
+        },
+
         async fetchOfflineWebhookConfig() {
           try {
             const res = await this.apiFetch("/api/config/offline-webhook");
@@ -2492,6 +3024,32 @@
             }
           } catch (e) {
             this.showToast("请求失败", "error");
+          }
+        },
+
+        async fetchOfflineBark() {
+          try {
+            const res = await this.apiFetch("/api/config/offline-bark");
+            this.offlineBark = await res.json();
+          } catch(e) {}
+        },
+
+        async saveOfflineBark() {
+          this.savingOfflineBark = true;
+          try {
+            const res = await this.apiFetch("/api/config/offline-bark", {
+              method: "POST",
+              body: this.offlineBark
+            });
+            if (res.ok) {
+              this.showToast(this.lang === 'zh' ? "账号下线 Bark 告警配置保存成功" : "Offline Bark config saved");
+            } else {
+              this.showToast("保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败: " + e, "error");
+          } finally {
+            this.savingOfflineBark = false;
           }
         },
 
@@ -2519,6 +3077,33 @@
             this.showToast("请求失败: " + e, "error");
           } finally {
             this.savingTodoWebhook = false;
+          }
+        },
+
+        async fetchTodoBark() {
+          try {
+            const res = await this.apiFetch("/api/config/todo-bark");
+            this.todoBark = await res.json();
+          } catch(e) {}
+        },
+
+        async saveTodoBark() {
+          this.savingTodoBark = true;
+          try {
+            const res = await this.apiFetch("/api/config/todo-bark", {
+              method: "POST",
+              body: this.todoBark
+            });
+            if (res.ok) {
+              this.showToast(this.lang === "zh" ? "待办默认 Bark 配置保存成功" : "Todo default Bark config saved");
+            } else {
+              const data = await res.json();
+              this.showToast(data.detail || "保存失败", "error");
+            }
+          } catch (e) {
+            this.showToast("请求失败: " + e, "error");
+          } finally {
+            this.savingTodoBark = false;
           }
         },
 
@@ -2678,10 +3263,21 @@
               exclude_senders: [...(rule.filters.exclude_senders || [])],
               use_regex: rule.filters.use_regex || false,
               debounce_seconds: rule.debounce_seconds || 0,
-              overrideWebhook: !!rule.webhook.url,
-              webhookUrl: rule.webhook.url || "",
-              webhookMethod: rule.webhook.method || "",
-              webhookCustomBody: rule.webhook.custom_body || ""
+              overrideWebhook: !!(rule.webhook && rule.webhook.url),
+              webhookUrl: (rule.webhook && rule.webhook.url) || "",
+              webhookMethod: (rule.webhook && rule.webhook.method) || "",
+              webhookCustomBody: (rule.webhook && rule.webhook.custom_body) || "",
+              overrideBark: !!(rule.bark && (rule.bark.is_enabled || rule.bark.device_key || rule.bark.sound || rule.bark.group)),
+              bark: {
+                is_enabled: (rule.bark && rule.bark.is_enabled !== undefined) ? rule.bark.is_enabled : true,
+                server_url: (rule.bark && rule.bark.server_url) || "",
+                device_key: (rule.bark && rule.bark.device_key) || "",
+                group: (rule.bark && rule.bark.group) || "",
+                sound: (rule.bark && rule.bark.sound) || "",
+                icon: (rule.bark && rule.bark.icon) || "",
+                level: (rule.bark && rule.bark.level) || "",
+                url: (rule.bark && rule.bark.url) || ""
+              }
             };
           } else {
             // 新建
@@ -2701,7 +3297,18 @@
               overrideWebhook: false,
               webhookUrl: "",
               webhookMethod: "",
-              webhookCustomBody: ""
+              webhookCustomBody: "",
+              overrideBark: false,
+              bark: {
+                is_enabled: true,
+                server_url: "",
+                device_key: "",
+                group: "",
+                sound: "",
+                icon: "",
+                level: "",
+                url: ""
+              }
             };
           }
           this.tempKeyword = "";
@@ -2783,6 +3390,16 @@
               method: this.ruleForm.overrideWebhook ? this.ruleForm.webhookMethod : "",
               custom_body: this.ruleForm.overrideWebhook ? this.ruleForm.webhookCustomBody : ""
             },
+            bark: this.ruleForm.overrideBark ? {
+              is_enabled: this.ruleForm.bark.is_enabled,
+              server_url: (this.ruleForm.bark.server_url || "").trim(),
+              device_key: (this.ruleForm.bark.device_key || "").trim(),
+              group: (this.ruleForm.bark.group || "").trim(),
+              sound: this.ruleForm.bark.sound || "",
+              icon: (this.ruleForm.bark.icon || "").trim(),
+              level: this.ruleForm.bark.level || "",
+              url: (this.ruleForm.bark.url || "").trim()
+            } : { is_enabled: false },
             debounce_seconds: parseInt(this.ruleForm.debounce_seconds || 0, 10),
             is_enabled: true
           };
@@ -2926,6 +3543,113 @@
           }
         },
 
+        // --- 测试 Bark 发送 ---
+        async testBark(type) {
+          let reqData = {
+            device_key: "",
+            server_url: "https://api.day.app",
+            group: "",
+            sound: "",
+            icon: "",
+            level: "active",
+            url: "",
+            event_type: "message"
+          };
+
+          if (type === 'global') {
+            this.testingBark = true;
+            reqData = {
+              device_key: this.globalBark.device_key,
+              server_url: this.globalBark.server_url || "https://api.day.app",
+              group: this.globalBark.group || "TG监控",
+              sound: this.globalBark.sound || "",
+              icon: this.globalBark.icon || "",
+              level: this.globalBark.level || "active",
+              url: this.globalBark.url || "",
+              event_type: "message"
+            };
+          } else if (type === 'offline') {
+            this.testingOfflineBark = true;
+            reqData = {
+              device_key: this.offlineBark.device_key || this.globalBark.device_key,
+              server_url: this.offlineBark.server_url || this.globalBark.server_url || "https://api.day.app",
+              group: this.offlineBark.group || "账号告警",
+              sound: this.offlineBark.sound || "alarm",
+              icon: this.offlineBark.icon || "",
+              level: this.offlineBark.level || "timeSensitive",
+              url: this.offlineBark.url || "",
+              event_type: "account_offline"
+            };
+          } else if (type === 'todo') {
+            this.testingTodoBark = true;
+            reqData = {
+              device_key: this.todoBark.device_key || this.globalBark.device_key,
+              server_url: this.todoBark.server_url || this.globalBark.server_url || "https://api.day.app",
+              group: this.todoBark.group || "定时待办",
+              sound: this.todoBark.sound || "alarm",
+              icon: this.todoBark.icon || "",
+              level: this.todoBark.level || "timeSensitive",
+              url: this.todoBark.url || "",
+              event_type: "todo_reminder"
+            };
+          } else if (type === 'rule') {
+            this.testingBark = true;
+            reqData = {
+              device_key: this.ruleForm.bark.device_key || this.globalBark.device_key,
+              server_url: this.ruleForm.bark.server_url || this.globalBark.server_url || "https://api.day.app",
+              group: this.ruleForm.bark.group || this.globalBark.group || "TG监控",
+              sound: this.ruleForm.bark.sound || this.globalBark.sound || "",
+              icon: this.ruleForm.bark.icon || this.globalBark.icon || "",
+              level: this.ruleForm.bark.level || this.globalBark.level || "active",
+              url: this.ruleForm.bark.url || this.globalBark.url || "",
+              event_type: "message"
+            };
+          } else if (type === 'todo_custom') {
+            this.testingTodoBark = true;
+            reqData = {
+              device_key: this.todoForm.bark.device_key || this.todoBark.device_key || this.globalBark.device_key,
+              server_url: this.todoForm.bark.server_url || this.todoBark.server_url || this.globalBark.server_url || "https://api.day.app",
+              group: this.todoForm.bark.group || this.todoBark.group || "定时待办",
+              sound: this.todoForm.bark.sound || this.todoBark.sound || "alarm",
+              icon: this.todoForm.bark.icon || this.todoBark.icon || "",
+              level: this.todoForm.bark.level || this.todoBark.level || "timeSensitive",
+              url: this.todoForm.bark.url || this.todoBark.url || "",
+              event_type: "todo_reminder"
+            };
+          }
+
+          if (!reqData.device_key) {
+            this.showToast(this.lang === 'zh' ? "请输入 Bark Device Key 或完整推送 URL 之后再进行测试" : "Please enter Bark Device Key or Push URL first", "error");
+            this.testingBark = false;
+            this.testingOfflineBark = false;
+            this.testingTodoBark = false;
+            return;
+          }
+
+          try {
+            const res = await this.apiFetch("/api/bark/test", {
+              method: "POST",
+              body: reqData
+            });
+            const data = await res.json();
+            this.testResult = {
+              status: data.status,
+              code: data.status_code,
+              elapsed: data.elapsed_ms,
+              response: data.response || data.message || "",
+              error: data.error || ""
+            };
+            this.showTestResultModal = true;
+          } catch (e) {
+            this.showToast("请求测试 API 失败: " + e, "error");
+          } finally {
+            this.testingBark = false;
+            this.testingOfflineBark = false;
+            this.testingTodoBark = false;
+            this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
         // --- 待办提醒函数与 API ---
         computeOffsetTarget() {
           const d = new Date();
@@ -3043,7 +3767,18 @@
               overrideWebhook: !!(todo.webhook && todo.webhook.url),
               webhookUrl: (todo.webhook && todo.webhook.url) || "",
               webhookMethod: (todo.webhook && todo.webhook.method) || "",
-              webhookCustomBody: (todo.webhook && todo.webhook.custom_body) || ""
+              webhookCustomBody: (todo.webhook && todo.webhook.custom_body) || "",
+              overrideBark: !!(todo.bark && (todo.bark.is_enabled || todo.bark.device_key || todo.bark.sound || todo.bark.group)),
+              bark: {
+                is_enabled: (todo.bark && todo.bark.is_enabled !== undefined) ? todo.bark.is_enabled : true,
+                server_url: (todo.bark && todo.bark.server_url) || "",
+                device_key: (todo.bark && todo.bark.device_key) || "",
+                group: (todo.bark && todo.bark.group) || "",
+                sound: (todo.bark && todo.bark.sound) || "",
+                icon: (todo.bark && todo.bark.icon) || "",
+                level: (todo.bark && todo.bark.level) || "",
+                url: (todo.bark && todo.bark.url) || ""
+              }
             };
           } else {
             const now = new Date();
@@ -3066,7 +3801,18 @@
               overrideWebhook: false,
               webhookUrl: "",
               webhookMethod: "",
-              webhookCustomBody: ""
+              webhookCustomBody: "",
+              overrideBark: false,
+              bark: {
+                is_enabled: true,
+                server_url: "",
+                device_key: "",
+                group: "",
+                sound: "alarm",
+                icon: "",
+                level: "timeSensitive",
+                url: ""
+              }
             };
             this.setQuickExactDate(1);
           }
@@ -3113,6 +3859,16 @@
               method: this.todoForm.overrideWebhook ? this.todoForm.webhookMethod : "",
               custom_body: this.todoForm.overrideWebhook ? this.todoForm.webhookCustomBody : ""
             },
+            bark: this.todoForm.overrideBark ? {
+              is_enabled: this.todoForm.bark.is_enabled,
+              server_url: (this.todoForm.bark.server_url || "").trim(),
+              device_key: (this.todoForm.bark.device_key || "").trim(),
+              group: (this.todoForm.bark.group || "").trim(),
+              sound: this.todoForm.bark.sound || "",
+              icon: (this.todoForm.bark.icon || "").trim(),
+              level: this.todoForm.bark.level || "",
+              url: (this.todoForm.bark.url || "").trim()
+            } : { is_enabled: false },
             is_enabled: true
           };
 
