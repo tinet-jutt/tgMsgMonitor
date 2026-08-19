@@ -22,6 +22,15 @@ import httpx
 import secrets
 import time
 
+# 确保全局默认时区为 Asia/Shanghai (UTC+8)
+if "TZ" not in os.environ:
+    os.environ["TZ"] = "Asia/Shanghai"
+if hasattr(time, "tzset"):
+    try:
+        time.tzset()
+    except Exception:
+        pass
+
 # 基础目录配置
 CONFIG_PATH = "config.json"
 SESSIONS_DIR = "sessions"

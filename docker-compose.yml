@@ -5,6 +5,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-tomato/tgmsgmonitor}:latest
     build: .
     container_name: tg_msg_monitor
+    environment:
+      - TZ=Asia/Shanghai
     ports:
       - "8010:8010"
     volumes:
