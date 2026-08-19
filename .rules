@@ -4,12 +4,11 @@
 ## Project Snapshot
 
 - Root: `/Users/tomato/Task/github/tgMsgMonitor`
-- Last refreshed: 2026-08-18
+- Last refreshed: 2026-08-19
 - Signal files: `README.md`, `requirements.txt`, `docker-compose.yml`
 - Top-level entries: `__pycache__/`, `app/`, `config.json`, `config.json.example`, `docker-compose.yml`, `Dockerfile`, `main.py`, `README.md`, `requirements.txt`, `sessions/`, `task.md`
 
 <!-- project-rules:managed:end -->
-
 ## Project Rules
 
 - 生产环境服务器连接：可通过 `vps2` 命令（对应 `ssh -A -p 22 root@154.12.85.111`）连接。
@@ -25,3 +24,4 @@
 ## Learned Experience
 
 - 2026-08-18 (生产环境部署): 生产环境服务器可通过 `vps2` 命令 (即 `ssh -A -p 22 root@154.12.85.111`) 连接；项目部署目录位于 `/root/APP/tgMsgMonitor`。Watchtower 已开启对 `tg_msg_monitor` 的 30 分钟定时巡检及 HTTP 即时更新 API。
+- 2026-08-19 (Docker容器时区修复与待办提醒): Docker容器基础镜像默认时区为 UTC，必须在 Dockerfile 中安装 tzdata 并配置 ENV TZ=Asia/Shanghai，否则 Python 中的 datetime.now() 与定时任务巡检比对会相差 8 小时导致按北京时间设定的定时任务无法准时触发。
