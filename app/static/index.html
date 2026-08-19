@@ -103,7 +103,9 @@
             <i data-lucide="calendar-clock" class="w-4 h-4"></i>
             <span x-text="t('tab_scheduled_todos')"></span>
             <template x-if="pendingConfirmCount > 0">
-              <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none shrink-0 animate-pulse" x-text="pendingConfirmCount"></span>
+              <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full shrink-0 animate-pulse">
+                <span class="leading-none -translate-y-[0.5px] tabular-nums select-none" x-text="pendingConfirmCount"></span>
+              </span>
             </template>
           </button>
         </nav>
