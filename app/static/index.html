@@ -1907,12 +1907,23 @@
             </div>
 
             <!-- 动态提前触发时间预览横幅 -->
-            <div class="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs flex items-center justify-between">
-              <div class="text-blue-300 font-medium flex items-center space-x-1.5">
-                <i data-lucide="alarm-clock" class="w-3.5 h-3.5 text-blue-400"></i>
-                <span x-text="t('lbl_expected_trigger_time')"></span>
+            <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs space-y-1.5">
+              <div class="flex items-center justify-between">
+                <div class="text-blue-300 font-medium flex items-center space-x-1.5">
+                  <i data-lucide="alarm-clock" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+                  <span x-text="t('lbl_expected_trigger_time')"></span>
+                </div>
+                <span class="text-white font-mono font-bold" x-text="getFormTriggerPreview()"></span>
               </div>
-              <span class="text-white font-mono font-bold" x-text="getFormTriggerPreview()"></span>
+              <template x-if="todoForm.is_recurring">
+                <div class="flex items-center justify-between pt-1.5 border-t border-blue-500/20">
+                  <div class="text-purple-300 font-medium flex items-center space-x-1.5">
+                    <i data-lucide="repeat" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+                    <span x-text="t('lbl_next_expected_trigger_time')"></span>
+                  </div>
+                  <span class="text-purple-200 font-mono font-bold" x-text="getFormNextTriggerPreview()"></span>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -2416,6 +2427,7 @@
             advance_before: "提前时间提醒",
             lbl_advance_time: "提前提醒量",
             lbl_expected_trigger_time: "预计触发提醒时间：",
+            lbl_next_expected_trigger_time: "下次预计触发提醒时间：",
             lbl_trigger_time: "触发提醒时间",
             lbl_confirm_mode: "确认机制",
             mode_auto_confirm: "自动确认 (到期自动发送 1 次 Webhook 并完成/进入下周期)",
@@ -2644,6 +2656,7 @@
             advance_before: "In Advance",
             lbl_advance_time: "Advance Amount",
             lbl_expected_trigger_time: "Estimated Trigger Time:",
+            lbl_next_expected_trigger_time: "Next Est. Trigger Time:",
             lbl_trigger_time: "Trigger Time",
             lbl_confirm_mode: "Confirmation Mode",
             mode_auto_confirm: "Auto Confirm (Triggers Webhook once & marks done/next)",
@@ -2906,6 +2919,8 @@
         toasts: [],
 
         init() {
+          this.$watch('todoForm.is_recurring', () => this.$nextTick(() => lucide.createIcons()));
+          this.$watch('todoForm.enable_advance', () => this.$nextTick(() => lucide.createIcons()));
           if (this.isLoggedIn) {
             this.refreshData();
             this.fetchSystemVersion();
@@ -3797,6 +3812,41 @@
           return `${year}-${month}-${date} ${hour}:${min}:${sec}`;
         },
 
+        computeNextRecurringTarget(targetDateStr, repeatVal, repeatUnit) {
+          if (!targetDateStr) return '';
+          let cleanStr = targetDateStr.replace('T', ' ');
+          if (cleanStr.length === 16) cleanStr += ":00";
+          const d = new Date(cleanStr.replace(/-/g, '/'));
+          if (isNaN(d.getTime())) return targetDateStr;
+
+          const val = parseInt(repeatVal, 10) || 1;
+          const unit = (repeatUnit || 'days').toLowerCase();
+
+          if (unit === 'minutes') {
+            d.setMinutes(d.getMinutes() + val);
+          } else if (unit === 'hours') {
+            d.setHours(d.getHours() + val);
+          } else if (unit === 'days') {
+            d.setDate(d.getDate() + val);
+          } else if (unit === 'weeks') {
+            d.setDate(d.getDate() + val * 7);
+          } else if (unit === 'months') {
+            const targetDay = d.getDate();
+            d.setMonth(d.getMonth() + val);
+            if (d.getDate() !== targetDay) {
+              d.setDate(0);
+            }
+          }
+
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const date = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          const sec = String(d.getSeconds()).padStart(2, '0');
+          return `${year}-${month}-${date} ${hour}:${min}:${sec}`;
+        },
+
         getFormTriggerPreview() {
           let targetStr = "";
           if (this.todoForm.dateMode === 'offset_days') {
@@ -3807,6 +3857,20 @@
           }
           if (!targetStr) return "-";
           return this.computeExpectedTriggerDate(targetStr, this.todoForm.enable_advance, this.todoForm.advance_value, this.todoForm.advance_unit);
+        },
+
+        getFormNextTriggerPreview() {
+          if (!this.todoForm.is_recurring) return "";
+          let targetStr = "";
+          if (this.todoForm.dateMode === 'offset_days') {
+            targetStr = this.computeOffsetTarget();
+          } else {
+            targetStr = (this.todoForm.exactDateTime || "").replace('T', ' ');
+            if (targetStr.length === 16) targetStr += ":00";
+          }
+          if (!targetStr) return "-";
+          const nextTarget = this.computeNextRecurringTarget(targetStr, this.todoForm.repeat_interval_value, this.todoForm.repeat_interval_unit);
+          return this.computeExpectedTriggerDate(nextTarget, this.todoForm.enable_advance, this.todoForm.advance_value, this.todoForm.advance_unit);
         },
 
         setQuickExactDate(days) {
