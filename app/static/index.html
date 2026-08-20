@@ -1821,17 +1821,17 @@
         <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
           <label class="block text-xs font-semibold text-purple-400 uppercase tracking-wider" x-text="t('lbl_exec_mode')"></label>
           <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label @click="todoForm.is_recurring = false" class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="!todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
-              <input type="radio" :value="false" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
+              <input type="radio" name="todo_recur_mode" :checked="!todoForm.is_recurring" class="text-purple-600 focus:ring-0 pointer-events-none">
               <div class="flex items-center space-x-1.5 text-xs font-semibold">
                 <i data-lucide="zap" class="w-3.5 h-3.5 text-purple-400"></i>
                 <span x-text="t('mode_once')"></span>
               </div>
             </label>
-            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label @click="todoForm.is_recurring = true" class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.is_recurring ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-brand-border text-gray-400'">
-              <input type="radio" :value="true" x-model="todoForm.is_recurring" class="text-purple-600 focus:ring-0">
+              <input type="radio" name="todo_recur_mode" :checked="todoForm.is_recurring" class="text-purple-600 focus:ring-0 pointer-events-none">
               <div class="flex items-center space-x-1.5 text-xs font-semibold">
                 <i data-lucide="repeat" class="w-3.5 h-3.5 text-purple-400"></i>
                 <span x-text="t('mode_recurring')"></span>
@@ -1862,17 +1862,17 @@
           </div>
 
           <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label @click="todoForm.enable_advance = false" class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="!todoForm.enable_advance ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-brand-border text-gray-400'">
-              <input type="radio" :value="false" x-model="todoForm.enable_advance" class="text-blue-600 focus:ring-0">
+              <input type="radio" name="todo_advance_mode" :checked="!todoForm.enable_advance" class="text-blue-600 focus:ring-0 pointer-events-none">
               <div class="flex items-center space-x-1.5 text-xs font-semibold">
                 <i data-lucide="bell" class="w-3.5 h-3.5 text-blue-400"></i>
                 <span x-text="t('advance_on_time')"></span>
               </div>
             </label>
-            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+            <label @click="todoForm.enable_advance = true" class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
                    :class="todoForm.enable_advance ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-brand-border text-gray-400'">
-              <input type="radio" :value="true" x-model="todoForm.enable_advance" class="text-blue-600 focus:ring-0">
+              <input type="radio" name="todo_advance_mode" :checked="todoForm.enable_advance" class="text-blue-600 focus:ring-0 pointer-events-none">
               <div class="flex items-center space-x-1.5 text-xs font-semibold">
                 <i data-lucide="bell-plus" class="w-3.5 h-3.5 text-blue-400"></i>
                 <span x-text="t('advance_before')"></span>
@@ -3781,7 +3781,8 @@
 
         computeExpectedTriggerDate(targetDateStr, enableAdvance, advanceVal, advanceUnit) {
           if (!targetDateStr) return '';
-          if (!enableAdvance || !advanceVal || advanceVal <= 0) return targetDateStr;
+          const isAdv = enableAdvance === true || enableAdvance === 'true';
+          if (!isAdv || !advanceVal || advanceVal <= 0) return targetDateStr;
           
           let cleanStr = targetDateStr.replace('T', ' ');
           if (cleanStr.length === 16) cleanStr += ":00";
@@ -3856,11 +3857,13 @@
             if (targetStr.length === 16) targetStr += ":00";
           }
           if (!targetStr) return "-";
-          return this.computeExpectedTriggerDate(targetStr, this.todoForm.enable_advance, this.todoForm.advance_value, this.todoForm.advance_unit);
+          const isAdv = this.todoForm.enable_advance === true || this.todoForm.enable_advance === 'true';
+          return this.computeExpectedTriggerDate(targetStr, isAdv, this.todoForm.advance_value, this.todoForm.advance_unit);
         },
 
         getFormNextTriggerPreview() {
-          if (!this.todoForm.is_recurring) return "";
+          const isRecur = this.todoForm.is_recurring === true || this.todoForm.is_recurring === 'true';
+          if (!isRecur) return "";
           let targetStr = "";
           if (this.todoForm.dateMode === 'offset_days') {
             targetStr = this.computeOffsetTarget();
@@ -3869,8 +3872,9 @@
             if (targetStr.length === 16) targetStr += ":00";
           }
           if (!targetStr) return "-";
+          const isAdv = this.todoForm.enable_advance === true || this.todoForm.enable_advance === 'true';
           const nextTarget = this.computeNextRecurringTarget(targetStr, this.todoForm.repeat_interval_value, this.todoForm.repeat_interval_unit);
-          return this.computeExpectedTriggerDate(nextTarget, this.todoForm.enable_advance, this.todoForm.advance_value, this.todoForm.advance_unit);
+          return this.computeExpectedTriggerDate(nextTarget, isAdv, this.todoForm.advance_value, this.todoForm.advance_unit);
         },
 
         setQuickExactDate(days) {
