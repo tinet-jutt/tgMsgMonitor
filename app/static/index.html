@@ -997,6 +997,14 @@
                     <span x-text="todo.confirm_type === 'manual' ? (lang === 'zh' ? `手动确认 (催办每 ${todo.remind_interval_minutes}m)` : `Manual Confirm (${todo.remind_interval_minutes}m retry)`) : t('todo_tag_auto_confirm')" class="leading-none"></span>
                   </span>
 
+                  <!-- 提前提醒徽章 (若配置了提前提醒) -->
+                  <template x-if="todo.advance_value && todo.advance_value > 0">
+                    <span class="inline-flex items-center justify-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md border font-medium leading-none whitespace-nowrap bg-blue-500/10 text-blue-300 border-blue-500/30" :title="lang === 'zh' ? '已配置提前触发提醒通知' : 'Advance reminder enabled'">
+                      <i data-lucide="alarm-clock" class="w-3.5 h-3.5 shrink-0 text-blue-400"></i>
+                      <span x-text="lang === 'zh' ? `提前 ${todo.advance_value} ${formatUnitText(todo.advance_unit)}提醒` : `Advance ${todo.advance_value} ${formatUnitText(todo.advance_unit)}`" class="leading-none"></span>
+                    </span>
+                  </template>
+
                   <!-- 标题 -->
                   <h3 class="text-base font-bold text-white tracking-wide ml-1 truncate" x-text="todo.title"></h3>
                 </div>
@@ -1059,6 +1067,13 @@
                     <span class="font-medium shrink-0" x-text="t('lbl_target_time') + ':'"></span>
                     <span class="text-white font-mono font-semibold" x-text="todo.target_date"></span>
                   </div>
+                  <template x-if="todo.advance_value && todo.advance_value > 0 && todo.status === 'pending'">
+                    <div class="flex items-center space-x-2 text-gray-400">
+                      <i data-lucide="alarm-clock" class="w-4 h-4 text-blue-400 shrink-0"></i>
+                      <span class="font-medium shrink-0" x-text="t('lbl_trigger_time') + ':'"></span>
+                      <span class="text-blue-300 font-mono font-semibold" x-text="computeExpectedTriggerDate(todo.target_date, true, todo.advance_value, todo.advance_unit)"></span>
+                    </div>
+                  </template>
                   <div class="flex items-center space-x-2 text-gray-400">
                     <i data-lucide="hourglass" class="w-4 h-4 text-amber-400 shrink-0"></i>
                     <span class="font-medium shrink-0" x-text="t('lbl_remaining_time') + ':'"></span>
@@ -1839,6 +1854,69 @@
           </div>
         </div>
 
+        <!-- 提前提醒设置 (到期准时 vs 提前提醒) -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-blue-400 uppercase tracking-wider" x-text="t('lbl_advance_reminder')"></label>
+            <span class="text-[10px] text-gray-500" x-text="t('lbl_advance_hint')"></span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="!todoForm.enable_advance ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" :value="false" x-model="todoForm.enable_advance" class="text-blue-600 focus:ring-0">
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="bell" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span x-text="t('advance_on_time')"></span>
+              </div>
+            </label>
+            <label class="flex items-center space-x-2.5 p-2.5 bg-brand-card border rounded-lg cursor-pointer transition"
+                   :class="todoForm.enable_advance ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-brand-border text-gray-400'">
+              <input type="radio" :value="true" x-model="todoForm.enable_advance" class="text-blue-600 focus:ring-0">
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <i data-lucide="bell-plus" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span x-text="t('advance_before')"></span>
+              </div>
+            </label>
+          </div>
+
+          <div x-show="todoForm.enable_advance" class="space-y-3 pt-2" x-cloak>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1" x-text="t('lbl_advance_time')"></label>
+              <div class="grid grid-cols-2 gap-3">
+                <input type="number" x-model.number="todoForm.advance_value" min="1" max="999" placeholder="1" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-blue-500 focus:outline-none rounded-lg text-sm text-white font-mono">
+                <select x-model="todoForm.advance_unit" class="w-full px-3 py-2 bg-brand-card border border-brand-border focus:border-blue-500 focus:outline-none rounded-lg text-sm text-white">
+                  <option value="minutes" x-text="t('unit_minutes')"></option>
+                  <option value="hours" x-text="t('unit_hours')"></option>
+                  <option value="days" x-text="t('unit_days')"></option>
+                  <option value="weeks" x-text="t('unit_weeks')"></option>
+                  <option value="months" x-text="t('unit_months')"></option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 快捷提前量选择 -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] text-gray-500 mr-1" x-text="lang === 'zh' ? '常用提前量:' : 'Quick:'"></span>
+              <button type="button" @click="todoForm.advance_value = 15; todoForm.advance_unit = 'minutes'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 15 分钟</button>
+              <button type="button" @click="todoForm.advance_value = 1; todoForm.advance_unit = 'hours'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 1 小时</button>
+              <button type="button" @click="todoForm.advance_value = 1; todoForm.advance_unit = 'days'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 1 天</button>
+              <button type="button" @click="todoForm.advance_value = 3; todoForm.advance_unit = 'days'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 3 天</button>
+              <button type="button" @click="todoForm.advance_value = 7; todoForm.advance_unit = 'days'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 7 天 (1周)</button>
+              <button type="button" @click="todoForm.advance_value = 1; todoForm.advance_unit = 'months'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 1 个月</button>
+            </div>
+
+            <!-- 动态提前触发时间预览横幅 -->
+            <div class="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs flex items-center justify-between">
+              <div class="text-blue-300 font-medium flex items-center space-x-1.5">
+                <i data-lucide="alarm-clock" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span x-text="t('lbl_expected_trigger_time')"></span>
+              </div>
+              <span class="text-white font-mono font-bold" x-text="getFormTriggerPreview()"></span>
+            </div>
+          </div>
+        </div>
+
         <!-- 确认方式 (自动确认 vs 手动确认) -->
         <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border space-y-3">
           <label class="block text-xs font-semibold text-amber-400 uppercase tracking-wider" x-text="t('lbl_confirm_mode')"></label>
@@ -2332,6 +2410,13 @@
             unit_days: "天",
             unit_weeks: "周",
             unit_months: "个月",
+            lbl_advance_reminder: "提前提醒设置",
+            lbl_advance_hint: "在到期前提前触发通知，不影响任务的到期周期与到期日",
+            advance_on_time: "到期准时提醒 (默认)",
+            advance_before: "提前时间提醒",
+            lbl_advance_time: "提前提醒量",
+            lbl_expected_trigger_time: "预计触发提醒时间：",
+            lbl_trigger_time: "触发提醒时间",
             lbl_confirm_mode: "确认机制",
             mode_auto_confirm: "自动确认 (到期自动发送 1 次 Webhook 并完成/进入下周期)",
             mode_manual_confirm: "手动确认 (到期触发后必须手动点击完成，未完成则持续催办)",
@@ -2553,6 +2638,13 @@
             unit_days: "Days",
             unit_weeks: "Weeks",
             unit_months: "Months",
+            lbl_advance_reminder: "Advance Reminder Notice",
+            lbl_advance_hint: "Trigger notification before due date without affecting repeat cycle",
+            advance_on_time: "On Due Date (Default)",
+            advance_before: "In Advance",
+            lbl_advance_time: "Advance Amount",
+            lbl_expected_trigger_time: "Estimated Trigger Time:",
+            lbl_trigger_time: "Trigger Time",
             lbl_confirm_mode: "Confirmation Mode",
             mode_auto_confirm: "Auto Confirm (Triggers Webhook once & marks done/next)",
             mode_manual_confirm: "Manual Confirm (Requires manual complete click; retries until confirmed)",
@@ -2759,6 +2851,9 @@
           is_recurring: false,
           repeat_interval_value: 1,
           repeat_interval_unit: "days",
+          enable_advance: false,
+          advance_value: 1,
+          advance_unit: "days",
           confirm_type: "auto", // 'auto' | 'manual'
           remind_interval_minutes: 30,
           overrideWebhook: false,
@@ -3669,6 +3764,51 @@
           return `${year}-${month}-${date} ${hour}:${min}:${sec}`;
         },
 
+        computeExpectedTriggerDate(targetDateStr, enableAdvance, advanceVal, advanceUnit) {
+          if (!targetDateStr) return '';
+          if (!enableAdvance || !advanceVal || advanceVal <= 0) return targetDateStr;
+          
+          let cleanStr = targetDateStr.replace('T', ' ');
+          if (cleanStr.length === 16) cleanStr += ":00";
+          const d = new Date(cleanStr.replace(/-/g, '/'));
+          if (isNaN(d.getTime())) return targetDateStr;
+          
+          const val = parseInt(advanceVal, 10) || 0;
+          const unit = (advanceUnit || 'days').toLowerCase();
+          
+          if (unit === 'minutes') {
+            d.setMinutes(d.getMinutes() - val);
+          } else if (unit === 'hours') {
+            d.setHours(d.getHours() - val);
+          } else if (unit === 'days') {
+            d.setDate(d.getDate() - val);
+          } else if (unit === 'weeks') {
+            d.setDate(d.getDate() - val * 7);
+          } else if (unit === 'months') {
+            d.setMonth(d.getMonth() - val);
+          }
+          
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const date = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          const sec = String(d.getSeconds()).padStart(2, '0');
+          return `${year}-${month}-${date} ${hour}:${min}:${sec}`;
+        },
+
+        getFormTriggerPreview() {
+          let targetStr = "";
+          if (this.todoForm.dateMode === 'offset_days') {
+            targetStr = this.computeOffsetTarget();
+          } else {
+            targetStr = (this.todoForm.exactDateTime || "").replace('T', ' ');
+            if (targetStr.length === 16) targetStr += ":00";
+          }
+          if (!targetStr) return "-";
+          return this.computeExpectedTriggerDate(targetStr, this.todoForm.enable_advance, this.todoForm.advance_value, this.todoForm.advance_unit);
+        },
+
         setQuickExactDate(days) {
           const d = new Date();
           d.setDate(d.getDate() + days);
@@ -3750,6 +3890,7 @@
           if (todo) {
             const isRecur = !!todo.is_recurring;
             const isManual = todo.confirm_type === 'manual';
+            const isAdvance = !!(todo.advance_value && todo.advance_value > 0);
             this.todoForm = {
               isEdit: true,
               id: todo.id,
@@ -3762,6 +3903,9 @@
               is_recurring: isRecur,
               repeat_interval_value: todo.repeat_interval_value || 1,
               repeat_interval_unit: todo.repeat_interval_unit || "days",
+              enable_advance: isAdvance,
+              advance_value: isAdvance ? todo.advance_value : 1,
+              advance_unit: todo.advance_unit || "days",
               confirm_type: isManual ? "manual" : "auto",
               remind_interval_minutes: todo.remind_interval_minutes || 30,
               overrideWebhook: !!(todo.webhook && todo.webhook.url),
@@ -3796,6 +3940,9 @@
               is_recurring: false,
               repeat_interval_value: 1,
               repeat_interval_unit: "days",
+              enable_advance: false,
+              advance_value: 1,
+              advance_unit: "days",
               confirm_type: "auto",
               remind_interval_minutes: 30,
               overrideWebhook: false,
@@ -3852,6 +3999,8 @@
             is_recurring: this.todoForm.is_recurring,
             repeat_interval_value: parseInt(this.todoForm.repeat_interval_value) || 1,
             repeat_interval_unit: this.todoForm.repeat_interval_unit || "days",
+            advance_value: this.todoForm.enable_advance ? (parseInt(this.todoForm.advance_value, 10) || 0) : 0,
+            advance_unit: this.todoForm.advance_unit || "days",
             confirm_type: this.todoForm.confirm_type || "auto",
             remind_interval_minutes: parseInt(this.todoForm.remind_interval_minutes) || 30,
             webhook: {

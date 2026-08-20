@@ -273,6 +273,8 @@ class TodoModel(BaseModel):
     is_recurring: bool = False
     repeat_interval_value: int = 1
     repeat_interval_unit: str = "days"  # minutes, hours, days, weeks, months
+    advance_value: int = 0
+    advance_unit: str = "days"  # minutes, hours, days, weeks, months
     confirm_type: str = "auto"  # auto / manual
     remind_interval_minutes: int = 30
     webhook: TodoWebhook = TodoWebhook()
@@ -1017,6 +1019,43 @@ def advance_datetime_by_interval(dt: datetime, val: int, unit: str) -> datetime:
         return dt.replace(year=year, month=month, day=day)
     return dt + timedelta(days=val)
 
+def calculate_advance_datetime(dt: datetime, val: int, unit: str) -> datetime:
+    """根据给定的提前数值和单位计算提前触发时间 (dt - advance)"""
+    if val <= 0:
+        return dt
+    unit = (unit or "days").lower()
+    if unit in ("minute", "minutes", "m", "min"):
+        return dt - timedelta(minutes=val)
+    elif unit in ("hour", "hours", "h"):
+        return dt - timedelta(hours=val)
+    elif unit in ("day", "days", "d"):
+        return dt - timedelta(days=val)
+    elif unit in ("week", "weeks", "w"):
+        return dt - timedelta(weeks=val)
+    elif unit in ("month", "months"):
+        # 减去 val 个月
+        total_months = dt.year * 12 + dt.month - 1 - val
+        year = total_months // 12
+        month = total_months % 12 + 1
+        day = min(dt.day, calendar.monthrange(year, month)[1])
+        return dt.replace(year=year, month=month, day=day)
+    return dt - timedelta(days=val)
+
+def format_advance_unit_str(val: int, unit: str) -> str:
+    """格式化提前提醒的中文描述"""
+    unit = (unit or "days").lower()
+    if unit in ("minute", "minutes", "m", "min"):
+        return f"{val}分钟"
+    elif unit in ("hour", "hours", "h"):
+        return f"{val}小时"
+    elif unit in ("day", "days", "d"):
+        return f"{val}天"
+    elif unit in ("week", "weeks", "w"):
+        return f"{val}周"
+    elif unit in ("month", "months"):
+        return f"{val}个月"
+    return f"{val}{unit}"
+
 def advance_target_to_future(target_dt: datetime, val: int, unit: str, now_dt: Optional[datetime] = None) -> datetime:
     """循环推进日期，直到超过当前时间"""
     if now_dt is None:
@@ -1068,8 +1107,15 @@ class TodoManager:
         confirm_type_str = "手动确认" if todo.get("confirm_type") == "manual" else "自动确认"
         recurring_str = f"循环执行 (每 {todo.get('repeat_interval_value', 1)} {todo.get('repeat_interval_unit', 'days')})" if todo.get("is_recurring") else "单次执行"
         
+        advance_val = todo.get("advance_value", 0) or 0
+        advance_unit = todo.get("advance_unit", "days") or "days"
+        has_advance = advance_val > 0
+        advance_desc = f"提前{format_advance_unit_str(advance_val, advance_unit)}" if has_advance else "到期准时"
+
         if is_retry:
             text = f"【待办催办提醒】您的待办任务「{title}」已到期且尚未确认完成！\n到期时间：{target_date}\n任务内容：{content or '无'}"
+        elif has_advance:
+            text = f"【待办提前提醒】您的待办任务「{title}」即将到期（{advance_desc}提醒）！\n实际到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
         else:
             text = f"【待办提醒】您的待办任务「{title}」已到期！\n到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
 
@@ -1083,6 +1129,7 @@ class TodoManager:
             "date": now_str,
             "confirm_type": confirm_type_str,
             "is_recurring": recurring_str,
+            "advance_info": advance_desc,
             "status": todo.get("status", "pending"),
             "text": text
         }
@@ -1090,7 +1137,7 @@ class TodoManager:
         # A. 触发 Webhook 推送
         if url:
             final_url = resolve_placeholders(url, placeholder_data, method)
-            logger.info(f"正在发送待办提醒 Webhook [{title}] (is_retry={is_retry}) 到 {final_url}...")
+            logger.info(f"正在发送待办提醒 Webhook [{title}] (is_retry={is_retry}, advance={advance_desc}) 到 {final_url}...")
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     if method.upper() == "GET":
@@ -1112,6 +1159,7 @@ class TodoManager:
                                 "title": title,
                                 "content": content,
                                 "target_date": target_date,
+                                "advance_info": advance_desc,
                                 "confirm_type": todo.get("confirm_type", "auto"),
                                 "is_recurring": todo.get("is_recurring", False),
                                 "trigger_time": now_str,
@@ -1144,8 +1192,16 @@ class TodoManager:
             active_bark = todo_bark_default
 
         if active_bark and (active_bark.get("device_key") or "").strip():
-            bark_title = f"⏰ 待办到期：{title}" if not is_retry else f"🔔 待办催办：{title}"
-            bark_body = f"到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+            if is_retry:
+                bark_title = f"🔔 待办催办：{title}"
+                bark_body = f"到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+            elif has_advance:
+                bark_title = f"⏰ 待办提前提醒：{title}"
+                bark_body = f"实际到期时间：{target_date} ({advance_desc})\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+            else:
+                bark_title = f"⏰ 待办到期：{title}"
+                bark_body = f"到期时间：{target_date}\n确认方式：{confirm_type_str}\n任务内容：{content or '无'}"
+
             asyncio.create_task(send_bark_push(
                 bark_config=active_bark,
                 title=bark_title,
@@ -1182,10 +1238,15 @@ class TodoManager:
             confirm_type = todo.get("confirm_type", "auto")
             is_recurring = todo.get("is_recurring", False)
 
-            # 1. 处于 pending 状态，检查是否到达触发时间
+            # 1. 处于 pending 状态，检查是否到达触发时间 (支持提前提醒)
             if status == "pending":
-                if now >= target_dt:
-                    logger.info(f"待办任务「{todo.get('title')}」已到期，开始触发提醒。")
+                advance_val = todo.get("advance_value", 0) or 0
+                advance_unit = todo.get("advance_unit", "days") or "days"
+                trigger_dt = calculate_advance_datetime(target_dt, advance_val, advance_unit)
+
+                if now >= trigger_dt:
+                    adv_log = f"(提前 {advance_val} {advance_unit})" if advance_val > 0 else ""
+                    logger.info(f"待办任务「{todo.get('title')}」达到提醒时间 {adv_log}，开始触发提醒。")
                     asyncio.create_task(self.trigger_todo_webhook(todo, is_retry=False))
                     todo["last_trigger_time"] = now_str
 
