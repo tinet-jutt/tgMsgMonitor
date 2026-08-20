@@ -26,3 +26,4 @@
 - 2026-08-18 (生产环境部署): 生产环境服务器可通过 `vps2` 命令 (即 `ssh -A -p 22 root@154.12.85.111`) 连接；项目部署目录位于 `/root/APP/tgMsgMonitor`。Watchtower 已开启对 `tg_msg_monitor` 的 30 分钟定时巡检及 HTTP 即时更新 API。
 - 2026-08-19 (Docker容器时区修复与待办提醒): Docker容器基础镜像默认时区为 UTC，必须在 Dockerfile 中安装 tzdata 并配置 ENV TZ=Asia/Shanghai，否则 Python 中的 datetime.now() 与定时任务巡检比对会相差 8 小时导致按北京时间设定的定时任务无法准时触发。
 - 2026-08-19 (Bark 通知渠道支持): 系统支持 Webhook 与 Bark (iOS/macOS) 双通道推送。Bark 采用 POST /push 协议，支持纯 Key 与完整 URL 智能解析。占位符支持纯文本解析避免 URL 编码乱码；支持 TG 监控全局/离线/规则覆盖及定时待办默认/任务专属 Bark 覆盖。
+- 2026-08-20 (Alpine.js 单选框布尔值绑定避坑): 在 Alpine.js 中若单选框直接使用 `:value="false"` 与 `x-model` 绑定布尔变量，浏览器原生单选事件会将变量赋为字符串 `"false"`（在 JS 条件判断及 `x-show` 中为真值导致折叠失效）。推荐在 `<label>` 上显式使用 `@click="state = false"` 赋值，并在 input 上使用 `:checked="!state"` 绑定，或在条件判断中统一做 `state === true || state === 'true'` 严格转换。
