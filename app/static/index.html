@@ -1905,26 +1905,26 @@
               <button type="button" @click="todoForm.advance_value = 7; todoForm.advance_unit = 'days'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 7 天 (1周)</button>
               <button type="button" @click="todoForm.advance_value = 1; todoForm.advance_unit = 'months'" class="px-2 py-0.5 bg-brand-card hover:bg-brand-border border border-brand-border rounded text-[11px] text-gray-300 transition">提前 1 个月</button>
             </div>
+          </div>
 
-            <!-- 动态提前触发时间预览横幅 -->
-            <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs space-y-1.5">
-              <div class="flex items-center justify-between">
-                <div class="text-blue-300 font-medium flex items-center space-x-1.5">
-                  <i data-lucide="alarm-clock" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
-                  <span x-text="t('lbl_expected_trigger_time')"></span>
-                </div>
-                <span class="text-white font-mono font-bold" x-text="getFormTriggerPreview()"></span>
+          <!-- 动态提前触发时间预览横幅 (常显，不受是否开启提前提醒影响) -->
+          <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs space-y-1.5">
+            <div class="flex items-center justify-between">
+              <div class="text-blue-300 font-medium flex items-center space-x-1.5">
+                <i data-lucide="alarm-clock" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+                <span x-text="t('lbl_expected_trigger_time')"></span>
               </div>
-              <template x-if="todoForm.is_recurring">
-                <div class="flex items-center justify-between pt-1.5 border-t border-blue-500/20">
-                  <div class="text-purple-300 font-medium flex items-center space-x-1.5">
-                    <i data-lucide="repeat" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
-                    <span x-text="t('lbl_next_expected_trigger_time')"></span>
-                  </div>
-                  <span class="text-purple-200 font-mono font-bold" x-text="getFormNextTriggerPreview()"></span>
-                </div>
-              </template>
+              <span class="text-white font-mono font-bold" x-text="getFormTriggerPreview()"></span>
             </div>
+            <template x-if="todoForm.is_recurring">
+              <div class="flex items-center justify-between pt-1.5 border-t border-blue-500/20">
+                <div class="text-purple-300 font-medium flex items-center space-x-1.5">
+                  <i data-lucide="repeat" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+                  <span x-text="t('lbl_next_expected_trigger_time')"></span>
+                </div>
+                <span class="text-purple-200 font-mono font-bold" x-text="getFormNextTriggerPreview()"></span>
+              </div>
+            </template>
           </div>
         </div>
 
