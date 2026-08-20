@@ -252,6 +252,19 @@
 
           <!-- Webhook 渠道表单 -->
           <div x-show="tgChannelTab === 'webhook'" class="space-y-4 pt-1">
+            <!-- 启用开关 -->
+            <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+              <div>
+                <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_global_webhook_enabled')"></span>
+                <span class="text-[11px] text-gray-500" x-text="t('desc_global_webhook')"></span>
+              </div>
+              <button type="button" @click="globalWebhook.is_enabled = !globalWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                      :class="globalWebhook.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+                <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                     :class="globalWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+              </button>
+            </div>
+
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
               <input type="url" x-model="globalWebhook.url" placeholder="https://api.example.com/webhook" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
@@ -405,6 +418,19 @@
 
           <!-- Webhook 告警表单 -->
           <div x-show="offlineChannelTab === 'webhook'" class="space-y-4 pt-1">
+            <!-- 启用开关 -->
+            <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+              <div>
+                <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_offline_webhook_enabled')"></span>
+                <span class="text-[11px] text-gray-500" x-text="t('desc_offline_webhook')"></span>
+              </div>
+              <button type="button" @click="offlineWebhook.is_enabled = !offlineWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                      :class="offlineWebhook.is_enabled ? 'bg-amber-600' : 'bg-gray-700'">
+                <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                     :class="offlineWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+              </button>
+            </div>
+
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_webhook_url')"></label>
               <input type="url" x-model="offlineWebhook.url" placeholder="https://api.example.com/offline-webhook?phone={phone}&reason={reason}" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
@@ -788,6 +814,19 @@
 
             <!-- Webhook 表单 -->
             <div x-show="todoChannelTab === 'webhook'" class="space-y-4 pt-1">
+              <!-- 启用开关 -->
+              <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
+                <div>
+                  <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_todo_webhook_enabled')"></span>
+                  <span class="text-[11px] text-gray-500" x-text="t('desc_todo_webhook')"></span>
+                </div>
+                <button type="button" @click="todoWebhook.is_enabled = !todoWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                        :class="todoWebhook.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+                  <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
+                       :class="todoWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
+                </button>
+              </div>
+
               <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_todo_default_url')"></label>
                 <input type="url" x-model="todoWebhook.url" placeholder="https://api.example.com/todo-webhook?title={title}&date={due_date}" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm transition text-white font-mono">
@@ -2276,6 +2315,12 @@
             card_webhook: "全局 Webhook 配置",
             card_offline_webhook: "账号下线告警 Webhook",
             offline_webhook_hint: "当账号被踢下线或 Session 失效时触发通知告警（若留空则继承使用全局 Webhook）。",
+            lbl_global_webhook_enabled: "启用全局 Webhook 推送",
+            desc_global_webhook: "开启后匹配到的消息将实时推送到 Webhook 接口",
+            lbl_offline_webhook_enabled: "启用 Webhook 离线告警",
+            desc_offline_webhook: "当账号离线/失效时立即向 Webhook 发送报警",
+            lbl_todo_webhook_enabled: "启用待办 Webhook 默认提醒",
+            desc_todo_webhook: "待办到期或催办时默认向 Webhook 发送通知提醒",
             lbl_webhook_url: "默认 Webhook URL",
             webhook_hint: "匹配到规则的消息，默认会推送到该接口。",
             lbl_webhook_method: "请求方法 (Method)",
@@ -2505,6 +2550,12 @@
             card_webhook: "Global Webhook Config",
             card_offline_webhook: "Account Offline Webhook",
             offline_webhook_hint: "Sent when an account goes offline or session expires (Uses Global Webhook if empty).",
+            lbl_global_webhook_enabled: "Enable Global Webhook Push",
+            desc_global_webhook: "Push matched TG messages directly to Webhook endpoint",
+            lbl_offline_webhook_enabled: "Enable Offline Webhook Alert",
+            desc_offline_webhook: "Push alert to Webhook when TG account goes offline",
+            lbl_todo_webhook_enabled: "Enable Todo Default Webhook Alert",
+            desc_todo_webhook: "Push alerts to Webhook when scheduled todos are due",
             lbl_webhook_url: "Default Webhook URL",
             webhook_hint: "Messages matching active rules will be sent here.",
             lbl_webhook_method: "Request Method",
@@ -2727,9 +2778,9 @@
         showResetTodoModal: false,
         resetTodoId: null,
         resetTargetDate: "",
-        globalWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
-        offlineWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
-        todoWebhook: { url: "", timeout: 10, method: "POST", custom_body: "" },
+        globalWebhook: { is_enabled: true, url: "", timeout: 10, method: "POST", custom_body: "" },
+        offlineWebhook: { is_enabled: true, url: "", timeout: 10, method: "POST", custom_body: "" },
+        todoWebhook: { is_enabled: true, url: "", timeout: 10, method: "POST", custom_body: "" },
         
         // Bark 通知渠道配置
         globalBark: { is_enabled: false, server_url: "https://api.day.app", device_key: "", group: "TG监控", sound: "", icon: "", level: "active", is_archive: 1, url: "", timeout: 10 },

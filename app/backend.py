@@ -182,18 +182,21 @@ async def send_bark_push(
 # ----------------- Pydantic 模型 -----------------
 
 class GlobalWebhookConfig(BaseModel):
+    is_enabled: bool = True
     url: str = ""
     timeout: int = 10
     method: str = "POST"  # GET / POST
     custom_body: str = ""
 
 class OfflineWebhookConfig(BaseModel):
+    is_enabled: bool = True
     url: str = ""
     timeout: int = 10
     method: str = "POST"
     custom_body: str = ""
 
 class TodoWebhookConfig(BaseModel):
+    is_enabled: bool = True
     url: str = ""
     timeout: int = 10
     method: str = "POST"
@@ -509,18 +512,23 @@ class TelegramManager:
         try:
             config = await self.config_manager.get_config()
             offline_conf = config.get("offline_webhook", {})
-            url = offline_conf.get("url", "").strip()
+            global_webhook = config.get("global_webhook", {})
 
-            if not url:
-                global_webhook = config.get("global_webhook", {})
+            url = ""
+            timeout = 10
+            method = "POST"
+            custom_body = ""
+
+            if offline_conf.get("is_enabled", True) and offline_conf.get("url", "").strip():
+                url = offline_conf.get("url", "").strip()
+                timeout = offline_conf.get("timeout", 10)
+                method = offline_conf.get("method", "POST")
+                custom_body = offline_conf.get("custom_body", "")
+            elif global_webhook.get("is_enabled", True) and global_webhook.get("url", "").strip() and offline_conf.get("is_enabled") is not False:
                 url = global_webhook.get("url", "").strip()
                 timeout = global_webhook.get("timeout", 10)
                 method = global_webhook.get("method", "POST")
                 custom_body = global_webhook.get("custom_body", "")
-            else:
-                timeout = offline_conf.get("timeout", 10)
-                method = offline_conf.get("method", "POST")
-                custom_body = offline_conf.get("custom_body", "")
 
             now_str = format_datetime()
             placeholder_data = {
@@ -728,10 +736,19 @@ class TelegramManager:
 
             # 5. 触发 Webhook
             rule_webhook = rule.get("webhook", {})
-            webhook_url = rule_webhook.get("url") or global_webhook.get("url")
+            webhook_url = ""
             webhook_timeout = global_webhook.get("timeout", 10)
-            webhook_method = rule_webhook.get("method") or global_webhook.get("method") or "POST"
-            webhook_custom_body = rule_webhook.get("custom_body") if rule_webhook.get("url") else global_webhook.get("custom_body") or ""
+            webhook_method = "POST"
+            webhook_custom_body = ""
+
+            if rule_webhook.get("url"):
+                webhook_url = rule_webhook.get("url")
+                webhook_method = rule_webhook.get("method") or global_webhook.get("method") or "POST"
+                webhook_custom_body = rule_webhook.get("custom_body") or ""
+            elif global_webhook.get("is_enabled", True) and global_webhook.get("url"):
+                webhook_url = global_webhook.get("url")
+                webhook_method = global_webhook.get("method") or "POST"
+                webhook_custom_body = global_webhook.get("custom_body") or ""
 
             # 整理占位符所需的数据
             message_date = format_datetime(event.message.date) if (event.message and event.message.date) else format_datetime()
@@ -1089,16 +1106,19 @@ class TodoManager:
         default_todo_webhook = config.get("todo_webhook", {})
         todo_custom_webhook = todo.get("webhook", {})
 
-        url = (todo_custom_webhook.get("url") or "").strip()
-        if not url:
-            url = (default_todo_webhook.get("url") or "").strip()
-            timeout = default_todo_webhook.get("timeout", 10)
-            method = default_todo_webhook.get("method", "POST")
-            custom_body = default_todo_webhook.get("custom_body", "")
-        else:
-            timeout = default_todo_webhook.get("timeout", 10)
+        url = ""
+        timeout = default_todo_webhook.get("timeout", 10)
+        method = "POST"
+        custom_body = ""
+
+        if todo_custom_webhook.get("url"):
+            url = (todo_custom_webhook.get("url") or "").strip()
             method = todo_custom_webhook.get("method") or default_todo_webhook.get("method") or "POST"
             custom_body = todo_custom_webhook.get("custom_body", "")
+        elif default_todo_webhook.get("is_enabled", True) and (default_todo_webhook.get("url") or "").strip():
+            url = (default_todo_webhook.get("url") or "").strip()
+            method = default_todo_webhook.get("method", "POST")
+            custom_body = default_todo_webhook.get("custom_body", "")
 
         now_str = format_datetime()
         title = todo.get("title", "")
@@ -1618,12 +1638,13 @@ async def delete_account(phone: str):
 @app.get("/api/config/webhook", dependencies=[Depends(verify_token)])
 async def get_webhook_config():
     config = await config_manager.get_config()
-    return config.get("global_webhook", {"url": "", "timeout": 10, "method": "POST", "custom_body": ""})
+    return config.get("global_webhook", {"is_enabled": True, "url": "", "timeout": 10, "method": "POST", "custom_body": ""})
 
 @app.post("/api/config/webhook", dependencies=[Depends(verify_token)])
 async def update_webhook_config(webhook_conf: GlobalWebhookConfig):
     config = await config_manager.get_config()
     config["global_webhook"] = {
+        "is_enabled": webhook_conf.is_enabled,
         "url": webhook_conf.url.strip(),
         "timeout": webhook_conf.timeout,
         "method": webhook_conf.method,
@@ -1637,12 +1658,13 @@ async def update_webhook_config(webhook_conf: GlobalWebhookConfig):
 @app.get("/api/config/offline-webhook", dependencies=[Depends(verify_token)])
 async def get_offline_webhook_config():
     config = await config_manager.get_config()
-    return config.get("offline_webhook", {"url": "", "timeout": 10, "method": "POST", "custom_body": ""})
+    return config.get("offline_webhook", {"is_enabled": True, "url": "", "timeout": 10, "method": "POST", "custom_body": ""})
 
 @app.post("/api/config/offline-webhook", dependencies=[Depends(verify_token)])
 async def update_offline_webhook_config(webhook_conf: OfflineWebhookConfig):
     config = await config_manager.get_config()
     config["offline_webhook"] = {
+        "is_enabled": webhook_conf.is_enabled,
         "url": webhook_conf.url.strip(),
         "timeout": webhook_conf.timeout,
         "method": webhook_conf.method,
@@ -1656,12 +1678,13 @@ async def update_offline_webhook_config(webhook_conf: OfflineWebhookConfig):
 @app.get("/api/config/todo-webhook", dependencies=[Depends(verify_token)])
 async def get_todo_webhook_config():
     config = await config_manager.get_config()
-    return config.get("todo_webhook", {"url": "", "timeout": 10, "method": "POST", "custom_body": ""})
+    return config.get("todo_webhook", {"is_enabled": True, "url": "", "timeout": 10, "method": "POST", "custom_body": ""})
 
 @app.post("/api/config/todo-webhook", dependencies=[Depends(verify_token)])
 async def update_todo_webhook_config(webhook_conf: TodoWebhookConfig):
     config = await config_manager.get_config()
     config["todo_webhook"] = {
+        "is_enabled": webhook_conf.is_enabled,
         "url": webhook_conf.url.strip(),
         "timeout": webhook_conf.timeout,
         "method": webhook_conf.method,
