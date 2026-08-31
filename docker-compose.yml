@@ -5,6 +5,9 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-tomato/tgmsgmonitor}:latest
     build: .
     container_name: tg_msg_monitor
+    labels:
+      # Watchtower can discover this service when label-based monitoring is enabled.
+      com.centurylinklabs.watchtower.enable: "true"
     environment:
       - TZ=Asia/Shanghai
     ports:
@@ -15,3 +18,14 @@ services:
       # 持久化后台配置参数（包含管理员密码、Webhook 及规则等）
       - ./config.json:/app/config.json
     restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

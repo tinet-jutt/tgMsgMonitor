@@ -19,7 +19,10 @@
   - 生产环境服务器上的 Watchtower 服务已配置监控 `tg_msg_monitor`：
     - **定时巡检周期**：每 **30 分钟** (1800 秒) 自动轮询检查 GHCR 镜像并在发现新版本时自动更新。
     - **主动即时更新**：在 Web 界面中点击「检查更新」->「立即开始更新」即可通过 HTTP API 触发立即更新（约 10~20 秒内完成）。
-    - **手动更新命令**：`cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d`。
+    - **手动更新命令**：`cd /root/APP/tgMsgMonitor && git pull --ff-only origin main && ./scripts/update.sh`；脚本会在健康检查通过后清理过期无标签镜像、未使用构建缓存和当前 Compose 项目的停止容器。
+
+- 生产更新禁止使用 `docker compose up -d --build` 作为常规发布路径；使用 `scripts/update.sh` 的 `pull + no-build + health-check + cleanup` 流程，避免在 VPS 上累积本地构建镜像。
+- Watchtower 的 `--cleanup` 只负责成功更新后移除被替换的旧镜像；它不是全局 Docker 垃圾回收，因此项目脚本仍保留定向的更新后清理步骤。
 
 ## Learned Experience
 

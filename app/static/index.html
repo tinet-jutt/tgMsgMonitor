@@ -4301,13 +4301,17 @@
 
         async triggerSystemUpdate() {
           this.updatingSystem = true;
+          const expectedCommit = (this.updateInfo.latest_commit_short || "").toLowerCase();
           try {
             const res = await this.apiFetch("/api/system/trigger-update", { method: "POST" });
             const data = await res.json();
-            if (data.status === 'success') {
+            if (data.status === 'success' || data.status === 'accepted') {
               this.showToast(data.message);
               // 开始轮询服务重启恢复
-              this.pollSystemOnlineAfterUpdate();
+              this.pollSystemOnlineAfterUpdate(expectedCommit);
+            } else if (data.status === 'in_progress') {
+              this.updatingSystem = false;
+              this.showToast(data.message, "info");
             } else if (data.status === 'manual_required') {
               this.updatingSystem = false;
               this.showToast(data.message, "info");
@@ -4321,31 +4325,60 @@
             }
           } catch(e) {
             // 容器可能在重启中导致连接断开，进入轮询
-            this.pollSystemOnlineAfterUpdate();
+            this.pollSystemOnlineAfterUpdate(expectedCommit);
           }
         },
 
-        pollSystemOnlineAfterUpdate() {
+        pollSystemOnlineAfterUpdate(expectedCommit = "") {
           let retryCount = 0;
           const maxRetries = 30; // 最多探测 60 秒
+          let polling = false;
+          let finished = false;
           const interval = setInterval(async () => {
+            if (polling || finished) return;
+            polling = true;
             retryCount++;
             try {
-              const res = await fetch("/api/system/version", { cache: "no-cache" });
-              if (res.status === 200 || res.status === 401) {
+              const token = localStorage.getItem('admin_token');
+              const res = await fetch("/api/system/version", {
+                cache: "no-cache",
+                headers: token ? { "Authorization": `Bearer ${token}` } : {}
+              });
+              if (res.status === 200) {
+                const version = await res.json();
+                const activeCommit = (version.commit_sha || version.commit_short || "").toLowerCase();
+                const versionMatches = !expectedCommit || activeCommit.startsWith(expectedCommit);
+                if (!versionMatches) {
+                  if (retryCount >= maxRetries) {
+                    clearInterval(interval);
+                    finished = true;
+                    this.updatingSystem = false;
+                    this.showToast(this.lang === 'zh' ? "服务已恢复，但运行版本未切换，请重新检查更新" : "Service recovered, but the expected version is not running", "error");
+                  }
+                  return;
+                }
                 clearInterval(interval);
+                finished = true;
                 this.updatingSystem = false;
                 this.showUpdateModal = false;
                 this.showToast(this.lang === 'zh' ? "系统已更新完毕并恢复运行！" : "System updated successfully!");
                 setTimeout(() => {
                   window.location.reload();
                 }, 1000);
+              } else if (res.status === 401) {
+                clearInterval(interval);
+                finished = true;
+                this.updatingSystem = false;
+                this.showToast(this.lang === 'zh' ? "服务已恢复，但版本校验未授权，请重新登录后检查" : "Service recovered, but version verification was unauthorized", "error");
               }
             } catch(e) {
               // 仍处于重启离线中
+            } finally {
+              polling = false;
             }
-            if (retryCount >= maxRetries) {
+            if (retryCount >= maxRetries && !finished) {
               clearInterval(interval);
+              finished = true;
               this.updatingSystem = false;
               this.showToast(this.lang === 'zh' ? "更新服务响应超时，请手动刷新页面尝试" : "Update timeout, please refresh manually", "error");
             }

@@ -74,6 +74,20 @@ Alternatively, you can build and run the application inside a Docker container:
   ```
 *(Note: Persisting the `./sessions` folder and `./config.json` is highly recommended so that you won't need to log in again after a container restart).*
 
+#### 6. Production Updates and Cleanup
+
+For the production checkout, use the project update script instead of rebuilding locally on every release:
+
+```bash
+cd /root/APP/tgMsgMonitor
+git pull --ff-only origin main
+./scripts/update.sh
+```
+
+The script serializes concurrent updates, pulls the GHCR image without a local build, recreates the Compose service with `--remove-orphans`, waits for the HTTP health check, then removes old dangling images outside the 7-day rollback window, unused BuildKit cache, and stopped containers belonging to this Compose project. It does not remove `sessions` or `config.json`.
+
+The external Watchtower service should keep `--cleanup`: it removes the image replaced by a successful Watchtower update. That option does not perform a general Docker prune, so the project script remains the canonical cleanup path for manual/fallback updates.
+
 ---
 
 ### 📖 Placeholders Reference
@@ -196,6 +210,20 @@ python main.py
     tg-monitor
   ```
 *(注意：请务必挂载并持久化主机上的 `./sessions` 和 `./config.json`，确保容器在意外重启后依然能自动免密重连您的 Telegram 账号配置。)*
+
+#### 6. 生产更新与自动清理
+
+生产服务器上的代码更新请使用项目脚本，不要把 `--build` 作为常规发布方式：
+
+```bash
+cd /root/APP/tgMsgMonitor
+git pull --ff-only origin main
+./scripts/update.sh
+```
+
+脚本会串行化并发更新，拉取 GHCR 镜像并以 `--no-build` 重建服务，清理同一 Compose 项目的孤儿/停止容器；通过 HTTP 健康检查后，再清理超出 7 天回滚窗口的无标签旧镜像和未使用构建缓存。`sessions` 与 `config.json` 不会被删除。
+
+外部 Watchtower 继续保留 `--cleanup`：它会在成功更新后删除被替换的旧镜像，但不是全局 Docker 垃圾回收，因此手动/兜底更新仍以 `scripts/update.sh` 为准。
 
 ---
 

@@ -2251,6 +2251,12 @@ async def trigger_test_todo(todo_id: str):
 _raw_ver = os.getenv("APP_VERSION", "v1.2.0")
 APP_VERSION = "v1.2.0" if _raw_ver in ("main", "dev", "") else _raw_ver
 APP_COMMIT_SHA = os.getenv("APP_COMMIT_SHA", "")
+try:
+    UPDATE_TRIGGER_COOLDOWN_SECONDS = max(30, int(os.getenv("UPDATE_TRIGGER_COOLDOWN_SECONDS", "120")))
+except ValueError:
+    UPDATE_TRIGGER_COOLDOWN_SECONDS = 120
+_last_update_trigger_at = 0.0
+_update_trigger_lock = asyncio.Lock()
 
 def get_current_version_info() -> Dict[str, str]:
     """获取当前系统运行的版本号与 Commit SHA"""
@@ -2332,50 +2338,104 @@ async def check_github_update() -> Dict[str, Any]:
             "current_commit_short": current["commit_short"]
         }
 
+def _local_update_script() -> Optional[str]:
+    """Resolve the host-side update script without assuming the app is in a Git checkout."""
+    configured = os.getenv("UPDATE_SCRIPT_PATH", "").strip()
+    candidates = [configured] if configured else []
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    candidates.append(os.path.join(project_root, "scripts", "update.sh"))
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
 async def trigger_system_update() -> Dict[str, Any]:
-    """主动触发系统镜像拉取更新与平滑重建"""
-    # 1. 优先使用 Watchtower HTTP API 触发容器镜像更新
-    watchtower_url = os.getenv("WATCHTOWER_API_URL", "http://172.17.0.1:8088/v1/update")
-    watchtower_token = os.getenv("WATCHTOWER_API_TOKEN", "admin123-update-token")
-    headers = {"Authorization": f"Bearer {watchtower_token}"}
+    """触发更新；只有服务恢复并通过版本校验后，前端才显示更新完成。"""
+    global _last_update_trigger_at
 
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(watchtower_url, headers=headers)
-            if resp.status_code in (200, 204):
-                logger.info("已成功向 Watchtower 发送更新指令！")
-                return {
-                    "status": "success",
-                    "mode": "watchtower",
-                    "message": "已向 Watchtower 触发自动更新指令，系统正在后台拉取最新镜像并平滑重建容器，请在 10~20 秒后刷新页面。"
-                }
-            else:
+    async with _update_trigger_lock:
+        now = time.monotonic()
+        if now - _last_update_trigger_at < UPDATE_TRIGGER_COOLDOWN_SECONDS:
+            return {
+                "status": "in_progress",
+                "mode": "lock",
+                "message": "更新请求已在处理中，请等待当前更新完成后再试。"
+            }
+        _last_update_trigger_at = now
+
+        # 1. 优先使用 Watchtower HTTP API 触发容器镜像更新。
+        watchtower_url = os.getenv("WATCHTOWER_API_URL", "http://172.17.0.1:8088/v1/update")
+        watchtower_token = os.getenv("WATCHTOWER_API_TOKEN", "admin123-update-token")
+        headers = {"Authorization": f"Bearer {watchtower_token}"}
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(watchtower_url, headers=headers)
+                if resp.status_code in (200, 204):
+                    logger.info("已成功向 Watchtower 发送更新指令，等待容器恢复与版本校验。")
+                    return {
+                        "status": "accepted",
+                        "mode": "watchtower",
+                        "completed": False,
+                        "message": "更新指令已被 Watchtower 接受，正在拉取镜像并重建容器；服务恢复后会自动校验运行版本。"
+                    }
                 logger.warning(f"Watchtower API 返回 HTTP {resp.status_code}")
-    except Exception as e:
-        logger.info(f"Watchtower API 连接失败 ({e})，尝试检测本地环境...")
+        except Exception as e:
+            logger.info(f"Watchtower API 连接失败 ({e})，尝试检测本地环境...")
 
-    # 2. 如果在本地 Git 开发环境直接运行
-    try:
-        import subprocess
-        is_git_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
-        if is_git_repo:
-            pull_res = subprocess.run(["git", "pull", "origin", "main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
-            if pull_res.returncode == 0:
-                return {
-                    "status": "success",
-                    "mode": "git",
-                    "message": f"Git 代码更新成功：{pull_res.stdout.strip()}。"
-                }
-    except Exception:
-        pass
+        # 2. 本地 Git checkout 只在宿主机运行时使用项目脚本；不再把 git pull 当作部署成功。
+        try:
+            import subprocess
+            in_container = os.path.exists("/.dockerenv") or bool(os.getenv("container"))
+            is_git_repo = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                timeout=5,
+            ).returncode == 0
+            update_script = _local_update_script()
+            if is_git_repo and not in_container and update_script:
+                project_root = os.path.dirname(os.path.dirname(update_script))
+                pull_res = subprocess.run(
+                    ["git", "pull", "--ff-only", "origin", "main"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    cwd=project_root,
+                    timeout=30,
+                )
+                if pull_res.returncode == 0:
+                    update_res = subprocess.run(
+                        [update_script],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        cwd=project_root,
+                        timeout=180,
+                    )
+                    if update_res.returncode == 0:
+                        return {
+                            "status": "accepted",
+                            "mode": "local-compose",
+                            "completed": False,
+                            "message": "代码与镜像更新流程已启动，服务恢复后会自动校验运行版本。"
+                        }
+                    logger.error("项目更新脚本执行失败，未报告为更新成功。")
+                else:
+                    logger.error("Git fast-forward 更新失败，未执行 Compose 更新。")
+        except Exception as e:
+            logger.warning(f"本地项目更新流程不可用: {e}")
 
-    # 3. 兜底提示手动更新指令
-    return {
-        "status": "manual_required",
-        "mode": "manual",
-        "message": "未能直接调用 Watchtower 自动更新。您可以在服务器终端执行以下命令拉取最新镜像并重启：",
-        "command": "cd /root/APP/tgMsgMonitor && docker compose pull && docker compose up -d"
-    }
+        _last_update_trigger_at = 0.0
+        return {
+            "status": "manual_required",
+            "mode": "manual",
+            "completed": False,
+            "message": "未能直接完成自动更新。请在服务器终端执行项目更新脚本：",
+            "command": "cd /root/APP/tgMsgMonitor && git pull --ff-only origin main && ./scripts/update.sh"
+        }
 
 @app.get("/api/system/version", dependencies=[Depends(verify_token)])
 async def get_system_version():
@@ -2391,5 +2451,3 @@ async def check_update():
 async def trigger_update():
     """主动触发系统在线更新"""
     return await trigger_system_update()
-
-
