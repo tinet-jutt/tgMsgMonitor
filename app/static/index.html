@@ -207,6 +207,16 @@
                   </div>
                 </div>
                 <div class="flex items-center space-x-2">
+                  <!-- 重新登录入口按钮 (离线或未激活时可见) -->
+                  <button type="button" 
+                          x-show="acc.status === 'offline' || (!acc.is_active && acc.status !== 'online')"
+                          @click="openLoginModal(acc)"
+                          class="px-2.5 py-1 text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-500/50 rounded-lg transition flex items-center space-x-1.5 shadow-sm"
+                          :title="t('btn_relogin')">
+                    <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                    <span x-text="t('btn_relogin')"></span>
+                  </button>
+
                   <!-- 删除账号确认 -->
                   <div x-data="{ confirmDelete: false }" class="relative">
                     <button type="button" x-show="!confirmDelete" @click="confirmDelete = true" class="p-1.5 text-gray-500 hover:text-red-400 rounded-md hover:bg-red-500/10 transition">
@@ -1170,9 +1180,9 @@
 
       <h3 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
         <i data-lucide="send" class="w-5 h-5 text-indigo-400"></i>
-        <span x-text="t('modal_login_title')"></span>
+        <span x-text="isRelogin ? t('modal_relogin_title') : t('modal_login_title')"></span>
       </h3>
-      <p class="text-xs text-gray-400 mb-6" x-text="lang === 'zh' ? '请输入 Telegram API 凭据进行交互式连接，登录凭据将加密保存在本地安全 Session 中。' : 'Please input Telegram API credentials for interactive authorization. Session will be securely stored in the local server.'"></p>
+      <p class="text-xs text-gray-400 mb-6" x-text="isRelogin ? (lang === 'zh' ? '正在为离线账号重新获取授权，请核对信息并获取验证码。' : 'Re-authorizing offline account. Please verify credentials and get verification code.') : (lang === 'zh' ? '请输入 Telegram API 凭据进行交互式连接，登录凭据将加密保存在本地安全 Session 中。' : 'Please input Telegram API credentials for interactive authorization. Session will be securely stored in the local server.')"></p>
 
       <div class="space-y-4">
         <!-- 错误提示 -->
@@ -2308,6 +2318,7 @@
             login_hint: "默认密码为 admin，请进入后台后及时修改",
             card_accounts: "Telegram 账号",
             btn_add_account: "添加账号",
+            btn_relogin: "重新登录",
             acc_status_online: "已在线",
             acc_status_connecting: "重连中 / 保活中",
             acc_status_logging: "登录验证中",
@@ -2348,6 +2359,7 @@
             rule_override_webhook: "覆盖全局 Webhook",
             // 登录弹窗
             modal_login_title: "添加 Telegram 账号",
+            modal_relogin_title: "重新登录 Telegram 账号",
             lbl_phone: "手机号 (带区号，如 +8613800000000)",
             btn_get_code: "获取验证码",
             lbl_sms_code: "输入 Telegram 验证码",
@@ -2543,6 +2555,7 @@
             login_hint: "Default password is admin. Change it after login.",
             card_accounts: "Telegram Accounts",
             btn_add_account: "Link Account",
+            btn_relogin: "Re-login",
             acc_status_online: "Online",
             acc_status_connecting: "Reconnecting",
             acc_status_logging: "Logging in",
@@ -2583,6 +2596,7 @@
             rule_override_webhook: "Dedicated Webhook",
             // Login Modal
             modal_login_title: "Link New Telegram Account",
+            modal_relogin_title: "Re-login Telegram Account",
             lbl_phone: "Phone (with country code, e.g., +18255729287)",
             btn_get_code: "Get Code",
             lbl_sms_code: "Enter SMS Code",
@@ -2861,6 +2875,7 @@
 
         // 登录参数
         loginStep: 1, // 1: API信息及手机号, 2: 验证码, 3: 两步验证密码
+        isRelogin: false,
         submittingLogin: false,
         loginError: "",
         loginForm: {
@@ -3280,11 +3295,23 @@
         },
 
         // --- 账号授权流程 ---
-        openLoginModal() {
+        openLoginModal(acc = null) {
           this.loginStep = 1;
           this.loginError = "";
           this.submittingLogin = false;
-          this.loginForm = { phone: "", api_id: "", api_hash: "", code: "", password: "" };
+          if (acc) {
+            this.isRelogin = true;
+            this.loginForm = {
+              phone: acc.phone || "",
+              api_id: acc.api_id || "",
+              api_hash: acc.api_hash || "",
+              code: "",
+              password: ""
+            };
+          } else {
+            this.isRelogin = false;
+            this.loginForm = { phone: "", api_id: "", api_hash: "", code: "", password: "" };
+          }
           this.showLoginModal = true;
           this.$nextTick(() => lucide.createIcons());
         },
@@ -3295,7 +3322,7 @@
 
         async sendCode() {
           if (!this.loginForm.phone || !this.loginForm.api_id || !this.loginForm.api_hash) {
-            this.loginError = "请填满所有字段。";
+            this.loginError = this.lang === 'zh' ? "请填满所有字段（手机号、API ID、API Hash）。" : "Please fill in all fields (Phone, API ID, API Hash).";
             return;
           }
           this.submittingLogin = true;
@@ -3312,12 +3339,12 @@
             const data = await res.json();
             if (res.ok && data.status === "need_code") {
               this.loginStep = 2;
-              this.showToast("验证码已发往客户端");
+              this.showToast(this.lang === 'zh' ? "验证码已发往 Telegram 客户端" : "Verification code sent to Telegram client");
             } else {
-              this.loginError = data.detail || "连接 Telegram 失败，请检查配置与网络环境。";
+              this.loginError = data.detail || (this.lang === 'zh' ? "连接 Telegram 失败，请检查配置与网络环境。" : "Failed to connect to Telegram. Please check credentials and network.");
             }
           } catch (e) {
-            this.loginError = "请求异常: " + e;
+            this.loginError = (this.lang === 'zh' ? "请求异常: " : "Request error: ") + e;
           } finally {
             this.submittingLogin = false;
             this.$nextTick(() => lucide.createIcons());
@@ -3326,7 +3353,7 @@
 
         async verifyCode() {
           if (!this.loginForm.code) {
-            this.loginError = "请输入验证码。";
+            this.loginError = this.lang === 'zh' ? "请输入验证码。" : "Please enter the verification code.";
             return;
           }
           this.submittingLogin = true;
@@ -3342,17 +3369,17 @@
             const data = await res.json();
             if (res.ok) {
               if (data.status === "success") {
-                this.showToast("登录绑定成功");
+                this.showToast(this.lang === 'zh' ? "登录绑定成功，监控已启动" : "Login successful, monitoring started");
                 this.closeLoginModal();
                 this.fetchAccounts();
               } else if (data.status === "need_password") {
                 this.loginStep = 3;
               }
             } else {
-              this.loginError = data.detail || "验证码验证失败，请重新确认。";
+              this.loginError = data.detail || (this.lang === 'zh' ? "验证码验证失败，请重新确认。" : "Verification failed. Please check code.");
             }
           } catch (e) {
-            this.loginError = "请求异常: " + e;
+            this.loginError = (this.lang === 'zh' ? "请求异常: " : "Request error: ") + e;
           } finally {
             this.submittingLogin = false;
             this.$nextTick(() => lucide.createIcons());
@@ -3361,7 +3388,7 @@
 
         async verify2FA() {
           if (!this.loginForm.password) {
-            this.loginError = "请输入两步验证密码。";
+            this.loginError = this.lang === 'zh' ? "请输入两步验证密码。" : "Please enter 2FA password.";
             return;
           }
           this.submittingLogin = true;
@@ -3376,14 +3403,14 @@
             });
             const data = await res.json();
             if (res.ok && data.status === "success") {
-              this.showToast("两步验证成功，登录成功");
+              this.showToast(this.lang === 'zh' ? "两步验证成功，登录成功" : "2FA verified, login successful");
               this.closeLoginModal();
               this.fetchAccounts();
             } else {
-              this.loginError = data.detail || "密码错误。";
+              this.loginError = data.detail || (this.lang === 'zh' ? "密码错误。" : "Incorrect password.");
             }
           } catch (e) {
-            this.loginError = "请求异常: " + e;
+            this.loginError = (this.lang === 'zh' ? "请求异常: " : "Request error: ") + e;
           } finally {
             this.submittingLogin = false;
             this.$nextTick(() => lucide.createIcons());

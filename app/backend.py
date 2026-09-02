@@ -303,8 +303,8 @@ class SystemConfig(BaseModel):
 # 登录 API 参数模型
 class SendCodeReq(BaseModel):
     phone: str
-    api_id: int
-    api_hash: str
+    api_id: Optional[int] = None
+    api_hash: Optional[str] = None
 
 class VerifyCodeReq(BaseModel):
     phone: str
@@ -1450,7 +1450,8 @@ async def get_accounts():
             
         result.append({
             "phone": phone,
-            "api_id": acc["api_id"],
+            "api_id": acc.get("api_id"),
+            "api_hash": acc.get("api_hash", ""),
             "status": status,
             "is_active": is_active
         })
@@ -1460,10 +1461,19 @@ async def get_accounts():
 async def send_code(req: SendCodeReq):
     phone = req.phone.strip()
     api_id = req.api_id
-    api_hash = req.api_hash.strip()
+    api_hash = (req.api_hash or "").strip()
+
+    # 如果 api_id 或 api_hash 未提供，尝试从已有配置中回填
+    config = await config_manager.get_config()
+    exist_acc = next((a for a in config.get("accounts", []) if a.get("phone") == phone), None)
+    if exist_acc:
+        if not api_id:
+            api_id = exist_acc.get("api_id")
+        if not api_hash:
+            api_hash = exist_acc.get("api_hash", "")
 
     if not phone or not api_id or not api_hash:
-        raise HTTPException(status_code=400, detail="参数不完整。")
+        raise HTTPException(status_code=400, detail="参数不完整，请提供手机号、API ID 与 API Hash。")
 
     # 1. 如果已在线，先断开并清理
     if phone in tg_manager.active_clients:
@@ -1481,9 +1491,18 @@ async def send_code(req: SendCodeReq):
             pass
         del tg_manager.login_clients[phone]
 
-    # 3. 创建新客户端实例并连接
+    # 3. 清理已失效或残留的旧 session 文件，确保全新生成 session
+    session_path = os.path.join(SESSIONS_DIR, f"session_{phone}")
+    session_file = f"{session_path}.session"
+    if os.path.exists(session_file):
+        try:
+            os.remove(session_file)
+            logger.info(f"重新登录前清理旧 Session 文件: {session_file}")
+        except Exception as e:
+            logger.warning(f"清理旧 Session 文件异常: {e}")
+
+    # 4. 创建新客户端实例并连接
     try:
-        session_path = os.path.join(SESSIONS_DIR, f"session_{phone}")
         client = TelegramClient(session_path, api_id, api_hash)
         await client.connect()
         
@@ -1495,9 +1514,6 @@ async def send_code(req: SendCodeReq):
         tg_manager.phone_code_hashes[phone] = sent_code.phone_code_hash
         
         # 更新 config 中的账号基本配置（暂时为未激活）
-        config = await config_manager.get_config()
-        # 查找是否已存在
-        exist_acc = next((a for a in config["accounts"] if a["phone"] == phone), None)
         if exist_acc:
             exist_acc["api_id"] = api_id
             exist_acc["api_hash"] = api_hash
