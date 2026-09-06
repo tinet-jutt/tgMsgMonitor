@@ -77,20 +77,22 @@
 
   <!-- 页面顶部导航栏 -->
   <header class="border-b border-brand-border bg-brand-card/80 backdrop-blur-md sticky top-0 z-40" x-show="isLoggedIn" x-cloak>
-    <div class="max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-6">
-        <div class="flex items-center space-x-3">
-          <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg">
-            <i data-lucide="eye" class="w-6 h-6"></i>
+    <div class="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- 左侧：Logo 与系统标题 -->
+      <div class="flex items-center space-x-3 sm:space-x-6 min-w-0">
+        <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+          <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg shrink-0">
+            <i data-lucide="eye" class="w-5 h-5 sm:w-6 sm:h-6"></i>
           </div>
-          <div>
-            <h1 class="text-lg font-bold text-white tracking-wide" x-text="t('app_title')"></h1>
-            <p class="text-xs text-gray-400" x-text="t('app_subtitle')"></p>
+          <div class="min-w-0">
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-wide truncate whitespace-nowrap" x-text="t('app_title')"></h1>
+            <p class="text-xs text-gray-400 hidden sm:block truncate" x-text="t('app_subtitle')"></p>
           </div>
         </div>
 
-        <!-- 核心 Tab 切换栏 -->
-        <nav class="hidden md:flex items-center space-x-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
+        <!-- 桌面端核心 Tab 切换栏 (>= md 显示) -->
+        <nav class="hidden md:flex items-center space-x-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border shrink-0">
           <button type="button" @click="currentTab = 'tg_monitor'" 
                   :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-brand-card'"
                   class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-2">
@@ -111,76 +113,153 @@
         </nav>
       </div>
 
-      <div class="flex items-center space-x-4">
-        <!-- 移动端 Tab 切换 -->
-        <div class="flex md:hidden items-center space-x-1 bg-brand-dark p-1 rounded-lg border border-brand-border">
-          <button type="button" @click="currentTab = 'tg_monitor'" :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs">
-            <i data-lucide="radio" class="w-4 h-4"></i>
-          </button>
-          <button type="button" @click="currentTab = 'scheduled_todos'" :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white' : 'text-gray-400'" class="p-1.5 rounded-md text-xs relative">
-            <i data-lucide="calendar-clock" class="w-4 h-4"></i>
-            <template x-if="pendingConfirmCount > 0">
-              <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+      <!-- 右侧工具栏 -->
+      <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+        
+        <!-- 在线状态指示器 (桌面与移动端自适应防换行) -->
+        <span class="text-[11px] sm:text-xs px-2 sm:px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1.5 whitespace-nowrap shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+          <span x-text="t('sys_online')" class="whitespace-nowrap"></span>
+        </span>
+
+        <!-- 桌面端工具按钮 (>= md 显示) -->
+        <div class="hidden md:flex items-center space-x-2">
+          <!-- 版本与检查更新按钮 -->
+          <button type="button" @click="checkSystemUpdate(true)" 
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 relative border shrink-0"
+                  :class="hasNewUpdate ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-sm' : 'bg-brand-border/40 border-transparent hover:bg-brand-border hover:text-white text-gray-300'"
+                  :title="t('btn_check_update')">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5" :class="hasNewUpdate ? 'text-amber-400' : 'text-indigo-400'"></i>
+            <span class="font-mono text-[11px]" x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short ? '#' + systemVersion.commit_short : 'v1.2.0')"></span>
+            <template x-if="hasNewUpdate">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 absolute -top-0.5 -right-0.5 shadow-sm"></span>
             </template>
+          </button>
+          <!-- 语言切换按钮 -->
+          <button type="button" @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 shrink-0" title="Switch Language">
+            <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+            <span x-text="lang === 'zh' ? 'English' : '简体中文'"></span>
+          </button>
+          <!-- 安全密码修改按钮 -->
+          <button type="button" @click="showPwdModal = true" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 shrink-0" :title="t('btn_pwd')">
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+            <span x-text="t('btn_pwd')"></span>
           </button>
         </div>
 
-        <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span x-text="t('sys_online')"></span>
-        </span>
-        <!-- 版本与检查更新按钮 -->
-        <button type="button" @click="checkSystemUpdate(true)" 
-                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 relative border"
-                :class="hasNewUpdate ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-sm' : 'bg-brand-border/40 border-transparent hover:bg-brand-border hover:text-white text-gray-300'"
-                :title="t('btn_check_update')">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5" :class="hasNewUpdate ? 'text-amber-400' : 'text-indigo-400'"></i>
-          <span class="font-mono text-[11px]" x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short ? '#' + systemVersion.commit_short : 'v1.2.0')"></span>
-          <template x-if="hasNewUpdate">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 absolute -top-0.5 -right-0.5 shadow-sm"></span>
-          </template>
-        </button>
-        <!-- 语言切换按钮 -->
-        <button type="button" @click="toggleLanguage()" class="px-2.5 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" title="Switch Language">
-          <i data-lucide="globe" class="w-3.5 h-3.5"></i>
-          <span x-text="lang === 'zh' ? 'English' : '简体中文'"></span>
-        </button>
-        <!-- 安全密码修改按钮 -->
-        <button type="button" @click="showPwdModal = true" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5" :title="t('btn_pwd')">
-          <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
-          <span x-text="t('btn_pwd')"></span>
-        </button>
-        <button type="button" @click="refreshData()" :disabled="refreshing" class="p-2 text-gray-400 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition disabled:opacity-50 flex items-center justify-center" :title="t('btn_refresh')">
+        <!-- 刷新数据按钮 (全端通用) -->
+        <button type="button" @click="refreshData()" :disabled="refreshing" class="p-2 text-gray-400 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition disabled:opacity-50 flex items-center justify-center shrink-0" :title="t('btn_refresh')">
           <span :class="refreshing ? 'animate-spin block' : 'block'">
-            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+            <i data-lucide="rotate-cw" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </span>
+        </button>
+
+        <!-- 移动端专属更多菜单按钮 (< md 显示) -->
+        <div class="relative md:hidden shrink-0" x-data="{ open: false }">
+          <button type="button" @click="open = !open; if (open) { $nextTick(() => lucide.createIcons()); }" 
+                  class="p-2 text-gray-300 hover:text-white bg-brand-border/50 hover:bg-brand-border rounded-lg transition relative flex items-center justify-center"
+                  :class="open ? 'bg-brand-border text-white' : ''"
+                  aria-label="More options">
+            <i data-lucide="more-vertical" class="w-4 h-4"></i>
+            <template x-if="hasNewUpdate">
+              <span class="w-2 h-2 rounded-full bg-amber-400 absolute -top-0.5 -right-0.5 shadow-sm animate-pulse"></span>
+            </template>
+          </button>
+
+          <!-- 移动端下拉功能卡片 -->
+          <div x-show="open" @click.outside="open = false" x-cloak
+               x-transition:enter="transition ease-out duration-150"
+               x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+               x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+               x-transition:leave="transition ease-in duration-100"
+               x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+               x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+               class="absolute right-0 mt-2 w-56 bg-brand-card/95 backdrop-blur-xl border border-brand-border rounded-2xl shadow-2xl p-2 space-y-1 z-50">
+            
+            <!-- 版本与检查更新 -->
+            <button type="button" @click="checkSystemUpdate(true); open = false;" 
+                    class="w-full px-3 py-2 text-left rounded-xl transition flex items-center justify-between text-xs"
+                    :class="hasNewUpdate ? 'bg-amber-500/10 text-amber-300 font-semibold' : 'text-gray-300 hover:bg-brand-dark/80'">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="sparkles" class="w-4 h-4" :class="hasNewUpdate ? 'text-amber-400' : 'text-indigo-400'"></i>
+                <span x-text="lang === 'zh' ? '系统版本' : 'Version'"></span>
+              </div>
+              <div class="flex items-center space-x-1 font-mono text-[11px]">
+                <span x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short ? '#' + systemVersion.commit_short : 'v1.2.0')"></span>
+                <template x-if="hasNewUpdate">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                </template>
+              </div>
+            </button>
+
+            <!-- 切换语言 -->
+            <button type="button" @click="toggleLanguage(); open = false;" 
+                    class="w-full px-3 py-2 text-left text-gray-300 hover:bg-brand-dark/80 rounded-xl transition flex items-center justify-between text-xs">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="globe" class="w-4 h-4 text-indigo-400"></i>
+                <span x-text="lang === 'zh' ? '界面语言' : 'Language'"></span>
+              </div>
+              <span class="text-indigo-400 font-semibold text-[11px]" x-text="lang === 'zh' ? 'English' : '简体中文'"></span>
+            </button>
+
+            <!-- 修改管理员密码 -->
+            <button type="button" @click="showPwdModal = true; open = false;" 
+                    class="w-full px-3 py-2 text-left text-gray-300 hover:bg-brand-dark/80 rounded-xl transition flex items-center space-x-2 text-xs">
+              <i data-lucide="key-round" class="w-4 h-4 text-indigo-400"></i>
+              <span x-text="t('btn_pwd')"></span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 移动端专属核心 Tab 分段控制器 (< md 显示) -->
+    <div class="md:hidden border-t border-brand-border/80 bg-brand-card/95 px-3 py-2">
+      <div class="grid grid-cols-2 p-1 bg-brand-dark rounded-xl border border-brand-border">
+        <button type="button" @click="currentTab = 'tg_monitor'" 
+                :class="currentTab === 'tg_monitor' ? 'bg-indigo-600 text-white font-semibold shadow-sm' : 'text-gray-400 hover:text-white'"
+                class="py-2 text-xs rounded-lg transition flex items-center justify-center space-x-2">
+          <i data-lucide="radio" class="w-4 h-4"></i>
+          <span x-text="t('tab_tg_monitor')"></span>
+        </button>
+        <button type="button" @click="currentTab = 'scheduled_todos'" 
+                :class="currentTab === 'scheduled_todos' ? 'bg-indigo-600 text-white font-semibold shadow-sm' : 'text-gray-400 hover:text-white'"
+                class="py-2 text-xs rounded-lg transition flex items-center justify-center space-x-2 relative">
+          <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+          <span x-text="t('tab_scheduled_todos')"></span>
+          <template x-if="pendingConfirmCount > 0">
+            <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none shrink-0 shadow-sm animate-pulse">
+              <span class="tabular-nums" x-text="pendingConfirmCount"></span>
+            </span>
+          </template>
         </button>
       </div>
     </div>
   </header>
 
   <!-- 主体区域 -->
-  <main class="max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6" x-show="isLoggedIn" x-cloak>
+  <main class="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6" x-show="isLoggedIn" x-cloak>
     
     <!-- Tab 1: TG 消息监控面板 -->
-    <div x-show="currentTab === 'tg_monitor'" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div x-show="currentTab === 'tg_monitor'" class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
       
       <!-- 左栏：账号管理 (1/3 宽度) -->
       <div class="lg:col-span-1 space-y-6">
-        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
-          <div class="flex items-center justify-between mb-6">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-5 sm:mb-6">
             <div class="flex items-center space-x-2">
               <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_accounts')"></h2>
             </div>
-            <button type="button" @click="openLoginModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/10 flex items-center space-x-1">
+            <button type="button" @click="openLoginModal()" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/10 flex items-center space-x-1 shrink-0">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               <span x-text="t('btn_add_account')"></span>
             </button>
           </div>
 
           <!-- 账号列表 -->
-          <div class="space-y-4">
+          <div class="space-y-3 sm:space-y-4">
             <template x-if="accounts.length === 0">
               <div class="text-center py-8 border border-dashed border-brand-border rounded-xl">
                 <i data-lucide="user-minus" class="w-8 h-8 text-gray-600 mx-auto mb-2"></i>
@@ -190,23 +269,23 @@
             </template>
             
             <template x-for="acc in accounts" :key="acc.phone">
-              <div class="p-4 bg-brand-dark/50 border border-brand-border hover:border-brand-border/80 rounded-xl flex items-center justify-between transition group">
-                <div class="flex items-center space-x-3">
-                  <div class="w-10 h-10 rounded-lg flex items-center justify-center" 
+              <div class="p-3.5 sm:p-4 bg-brand-dark/50 border border-brand-border hover:border-brand-border/80 rounded-xl flex items-center justify-between transition group gap-2">
+                <div class="flex items-center space-x-3 min-w-0">
+                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0" 
                        :class="acc.status === 'online' ? 'bg-emerald-500/10 text-emerald-400' : (acc.status === 'connecting' || acc.status === 'logging_in') ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'">
-                    <i data-lucide="send" class="w-5 h-5"></i>
+                    <i data-lucide="send" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                   </div>
-                  <div>
-                    <div class="text-sm font-semibold text-white" x-text="acc.phone"></div>
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-white truncate font-mono" x-text="acc.phone"></div>
                     <div class="flex items-center space-x-1.5 mt-0.5">
-                      <span class="w-1.5 h-1.5 rounded-full" 
+                      <span class="w-1.5 h-1.5 rounded-full shrink-0" 
                             :class="acc.status === 'online' ? 'bg-emerald-400' : (acc.status === 'connecting' || acc.status === 'logging_in') ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"></span>
-                      <span class="text-xs text-gray-400" 
+                      <span class="text-xs text-gray-400 whitespace-nowrap" 
                             x-text="acc.status === 'online' ? t('acc_status_online') : acc.status === 'connecting' ? t('acc_status_connecting') : acc.status === 'logging_in' ? t('acc_status_logging') : t('acc_status_offline')"></span>
                     </div>
                   </div>
                 </div>
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-2 shrink-0">
                   <!-- 重新登录入口按钮 (离线或未激活时可见) -->
                   <button type="button" 
                           x-show="acc.status === 'offline' || (!acc.is_active && acc.status !== 'online')"
@@ -235,14 +314,14 @@
         </div>
 
         <!-- 全局通知渠道配置面板 (Webhook & Bark) -->
-        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between mb-2">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between mb-1 sm:mb-2">
             <div class="flex items-center space-x-2">
               <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_global_channels')"></h2>
             </div>
             <!-- 帮助问号说明链接按钮 -->
-            <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+            <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1 shrink-0" :title="t('modal_help_title')">
               <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
             </button>
@@ -264,11 +343,11 @@
           <div x-show="tgChannelTab === 'webhook'" class="space-y-4 pt-1">
             <!-- 启用开关 -->
             <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-              <div>
+              <div class="pr-2">
                 <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_global_webhook_enabled')"></span>
-                <span class="text-[11px] text-gray-500" x-text="t('desc_global_webhook')"></span>
+                <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="t('desc_global_webhook')"></span>
               </div>
-              <button type="button" @click="globalWebhook.is_enabled = !globalWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+              <button type="button" @click="globalWebhook.is_enabled = !globalWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                       :class="globalWebhook.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                 <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                      :class="globalWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -296,15 +375,15 @@
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_timeout')"></label>
               <input type="number" x-model.number="globalWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
             </div>
-            <div class="grid grid-cols-2 gap-4 pt-2">
-              <button type="button" @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingWebhook"></i>
-                <span x-show="!testingWebhook" x-text="t('btn_test_conn')"></span>
-                <span x-show="testingWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+              <button type="button" @click="testWebhook('global')" :disabled="testingWebhook" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-indigo-400 shrink-0" x-show="!testingWebhook"></i>
+                <span x-show="!testingWebhook" x-text="t('btn_test_conn')" class="truncate"></span>
+                <span x-show="testingWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
-              <button type="button" @click="saveGlobalWebhook()" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
-                <i data-lucide="save" class="w-4 h-4"></i>
-                <span x-text="t('btn_save_config')"></span>
+              <button type="button" @click="saveGlobalWebhook()" class="py-2 px-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm">
+                <i data-lucide="save" class="w-4 h-4 shrink-0"></i>
+                <span x-text="t('btn_save_config')" class="truncate"></span>
               </button>
             </div>
           </div>
@@ -313,11 +392,11 @@
           <div x-show="tgChannelTab === 'bark'" class="space-y-4 pt-1">
             <!-- 启用开关 -->
             <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-              <div>
+              <div class="pr-2">
                 <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_bark_enabled')"></span>
-                <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '开启后匹配到的消息将实时推送到 iOS / macOS 客户端' : 'Push matched TG messages directly to Bark iOS/macOS'"></span>
+                <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="lang === 'zh' ? '开启后匹配到的消息将实时推送到 iOS / macOS 客户端' : 'Push matched TG messages directly to Bark iOS/macOS'"></span>
               </div>
-              <button type="button" @click="globalBark.is_enabled = !globalBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+              <button type="button" @click="globalBark.is_enabled = !globalBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                       :class="globalBark.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                 <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                      :class="globalBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -367,29 +446,29 @@
               <input type="text" x-model="globalBark.url" placeholder="https://t.me/..." class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
             </div>
 
-            <div class="grid grid-cols-2 gap-4 pt-2">
-              <button type="button" @click="testBark('global')" :disabled="testingBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingBark"></i>
-                <span x-show="!testingBark" x-text="t('btn_test_bark')"></span>
-                <span x-show="testingBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+              <button type="button" @click="testBark('global')" :disabled="testingBark" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-indigo-400 shrink-0" x-show="!testingBark"></i>
+                <span x-show="!testingBark" x-text="t('btn_test_bark')" class="truncate"></span>
+                <span x-show="testingBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
-              <button type="button" @click="saveGlobalBark()" :disabled="savingGlobalBark" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="save" class="w-4 h-4" x-show="!savingGlobalBark"></i>
-                <span x-show="!savingGlobalBark" x-text="t('btn_save_bark')"></span>
-                <span x-show="savingGlobalBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <button type="button" @click="saveGlobalBark()" :disabled="savingGlobalBark" class="py-2 px-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="save" class="w-4 h-4 shrink-0" x-show="!savingGlobalBark"></i>
+                <span x-show="!savingGlobalBark" x-text="t('btn_save_bark')" class="truncate"></span>
+                <span x-show="savingGlobalBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
             </div>
           </div>
         </div>
 
         <!-- 账号下线告警通知渠道配置 (Webhook & Bark) -->
-        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between mb-2">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between mb-1 sm:mb-2">
             <div class="flex items-center space-x-2">
               <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_offline_channels')"></h2>
             </div>
-            <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-amber-600/20 text-amber-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+            <button type="button" @click="openHelpModal('tg')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-amber-600/20 text-amber-400 rounded transition flex items-center space-x-1 shrink-0" :title="t('modal_help_title')">
               <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
               <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
             </button>
@@ -430,11 +509,11 @@
           <div x-show="offlineChannelTab === 'webhook'" class="space-y-4 pt-1">
             <!-- 启用开关 -->
             <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-              <div>
+              <div class="pr-2">
                 <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_offline_webhook_enabled')"></span>
-                <span class="text-[11px] text-gray-500" x-text="t('desc_offline_webhook')"></span>
+                <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="t('desc_offline_webhook')"></span>
               </div>
-              <button type="button" @click="offlineWebhook.is_enabled = !offlineWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+              <button type="button" @click="offlineWebhook.is_enabled = !offlineWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                       :class="offlineWebhook.is_enabled ? 'bg-amber-600' : 'bg-gray-700'">
                 <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                      :class="offlineWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -457,15 +536,15 @@
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_custom_body')"></label>
               <textarea x-model="offlineWebhook.custom_body" rows="3" placeholder='{"event": "account_offline", "phone": "{phone}", "reason": "{reason}", "date": "{date}"}' class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-amber-500 focus:outline-none rounded-lg text-xs text-white font-mono"></textarea>
             </div>
-            <div class="grid grid-cols-2 gap-4 pt-2">
-              <button type="button" @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineWebhook"></i>
-                <span x-show="!testingOfflineWebhook" x-text="t('btn_test_conn')"></span>
-                <span x-show="testingOfflineWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+              <button type="button" @click="testWebhook('offline')" :disabled="testingOfflineWebhook" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-amber-400 shrink-0" x-show="!testingOfflineWebhook"></i>
+                <span x-show="!testingOfflineWebhook" x-text="t('btn_test_conn')" class="truncate"></span>
+                <span x-show="testingOfflineWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
-              <button type="button" @click="saveOfflineWebhook()" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm">
-                <i data-lucide="save" class="w-4 h-4"></i>
-                <span x-text="t('btn_save_config')"></span>
+              <button type="button" @click="saveOfflineWebhook()" class="py-2 px-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm">
+                <i data-lucide="save" class="w-4 h-4 shrink-0"></i>
+                <span x-text="t('btn_save_config')" class="truncate"></span>
               </button>
             </div>
           </div>
@@ -473,11 +552,11 @@
           <!-- Bark 告警表单 -->
           <div x-show="offlineChannelTab === 'bark'" class="space-y-4 pt-1">
             <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-              <div>
+              <div class="pr-2">
                 <span class="text-xs font-semibold text-gray-200 block" x-text="lang === 'zh' ? '启用 Bark 离线告警' : 'Enable Offline Bark Alert'"></span>
-                <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '当账号离线/失效时立即向 Bark 发送时效性告警' : 'Push high-priority alert to Bark when TG account goes offline'"></span>
+                <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="lang === 'zh' ? '当账号离线/失效时立即向 Bark 发送时效性告警' : 'Push high-priority alert to Bark when TG account goes offline'"></span>
               </div>
-              <button type="button" @click="offlineBark.is_enabled = !offlineBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+              <button type="button" @click="offlineBark.is_enabled = !offlineBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                       :class="offlineBark.is_enabled ? 'bg-amber-600' : 'bg-gray-700'">
                 <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                      :class="offlineBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -519,16 +598,16 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4 pt-2">
-              <button type="button" @click="testBark('offline')" :disabled="testingOfflineBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="play" class="w-4 h-4 text-amber-400" x-show="!testingOfflineBark"></i>
-                <span x-show="!testingOfflineBark" x-text="lang === 'zh' ? '测试 Bark 告警' : 'Test Bark Alert'"></span>
-                <span x-show="testingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+              <button type="button" @click="testBark('offline')" :disabled="testingOfflineBark" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4 text-amber-400 shrink-0" x-show="!testingOfflineBark"></i>
+                <span x-show="!testingOfflineBark" x-text="lang === 'zh' ? '测试 Bark 告警' : 'Test Bark Alert'" class="truncate"></span>
+                <span x-show="testingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
-              <button type="button" @click="saveOfflineBark()" :disabled="savingOfflineBark" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                <i data-lucide="save" class="w-4 h-4" x-show="!savingOfflineBark"></i>
-                <span x-show="!savingOfflineBark" x-text="t('btn_save_bark')"></span>
-                <span x-show="savingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <button type="button" @click="saveOfflineBark()" :disabled="savingOfflineBark" class="py-2 px-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                <i data-lucide="save" class="w-4 h-4 shrink-0" x-show="!savingOfflineBark"></i>
+                <span x-show="!savingOfflineBark" x-text="t('btn_save_bark')" class="truncate"></span>
+                <span x-show="savingOfflineBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
               </button>
             </div>
           </div>
@@ -537,20 +616,20 @@
 
       <!-- 右栏：监控规则 (2/3 宽度) -->
       <div class="lg:col-span-2 space-y-6">
-        <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl">
-          <div class="flex items-center justify-between mb-6">
+        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-5 sm:mb-6">
             <div class="flex items-center space-x-2">
               <i data-lucide="shield-alert" class="w-5 h-5 text-indigo-400"></i>
               <h2 class="text-md font-bold text-white" x-text="t('card_rules')"></h2>
             </div>
-            <button type="button" @click="openRuleModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/20 flex items-center space-x-1.5">
+            <button type="button" @click="openRuleModal()" class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md shadow-indigo-500/20 flex items-center space-x-1.5 shrink-0">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span x-text="t('btn_new_rule')"></span>
             </button>
           </div>
 
           <!-- 规则列表 -->
-          <div class="space-y-6">
+          <div class="space-y-4 sm:space-y-6">
             <template x-if="rules.length === 0">
               <div class="text-center py-16 border border-dashed border-brand-border rounded-xl">
                 <i data-lucide="alert-circle" class="w-10 h-10 text-gray-600 mx-auto mb-3"></i>
@@ -560,13 +639,13 @@
             </template>
 
             <template x-for="rule in rules" :key="rule.id">
-              <div class="border border-brand-border hover:border-brand-border/80 rounded-xl p-5 bg-brand-dark/20 transition relative" :class="!rule.is_enabled ? 'opacity-60' : ''">
+              <div class="border border-brand-border hover:border-brand-border/80 rounded-xl p-4 sm:p-5 bg-brand-dark/20 transition relative" :class="!rule.is_enabled ? 'opacity-60' : ''">
                 <!-- 头部状态栏 -->
-                <div class="flex items-start justify-between mb-4">
-                  <div class="space-y-1">
-                    <div class="flex items-center space-x-2">
-                      <span class="text-md font-bold text-white" x-text="rule.name"></span>
-                      <span x-show="rule.filters.use_regex" class="inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 leading-none" x-text="t('rule_regex_active')"></span>
+                <div class="flex items-start justify-between mb-4 gap-2">
+                  <div class="space-y-1 min-w-0 flex-1">
+                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <span class="text-sm sm:text-md font-bold text-white break-words" x-text="rule.name"></span>
+                      <span x-show="rule.filters.use_regex" class="inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 leading-none shrink-0" x-text="t('rule_regex_active')"></span>
                     </div>
                     <!-- 绑定账号列表 -->
                     <div class="flex flex-wrap items-center gap-1.5">
@@ -582,16 +661,16 @@
                     </div>
                   </div>
                   
-                  <div class="flex items-center space-x-3">
+                  <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
                     <!-- Toggle 开关 -->
-                    <button type="button" @click="toggleRule(rule.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                    <button type="button" @click="toggleRule(rule.id)" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                             :class="rule.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                       <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                            :class="rule.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
                     </button>
 
                     <!-- 删除与编辑 -->
-                    <div class="flex items-center space-x-1.5 border-l border-brand-border pl-3">
+                    <div class="flex items-center space-x-1 border-l border-brand-border pl-2 sm:pl-3 shrink-0">
                       <button type="button" @click="openRuleModal(rule)" class="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-brand-border transition" :title="t('btn_edit')">
                         <i data-lucide="pencil" class="w-4 h-4"></i>
                       </button>
@@ -612,7 +691,7 @@
                 </div>
 
                 <!-- 监控详情配置 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-brand-dark/40 p-4 rounded-lg border border-brand-border/40">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-xs bg-brand-dark/40 p-3.5 sm:p-4 rounded-lg border border-brand-border/40">
                   <div class="space-y-2">
                     <div>
                       <span class="text-gray-500 font-medium flex items-center space-x-1.5 mb-1.5">
@@ -681,18 +760,18 @@
 
                 <!-- 专属 Webhook 与 Bark 与防抖展示 -->
                 <div class="mt-3 flex items-center justify-between text-xs text-gray-400 pl-1 flex-wrap gap-2">
-                  <div class="flex items-center space-x-4 flex-wrap gap-y-1">
-                    <div class="flex items-center space-x-1.5 truncate max-w-md">
-                      <i data-lucide="link" class="w-3.5 h-3.5 text-gray-500"></i>
-                      <span>Webhook:</span>
+                  <div class="flex items-center space-x-4 flex-wrap gap-y-1 min-w-0 flex-1">
+                    <div class="flex items-center space-x-1.5 truncate max-w-full sm:max-w-md">
+                      <i data-lucide="link" class="w-3.5 h-3.5 text-gray-500 shrink-0"></i>
+                      <span class="shrink-0">Webhook:</span>
                       <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="rule.webhook.url ? (rule.webhook.method || 'POST') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
                       <span class="truncate text-indigo-300 font-mono" x-text="rule.webhook.url || (lang === 'zh' ? '使用全局 Webhook URL' : 'Using Global Webhook')"></span>
                     </div>
 
                     <template x-if="rule.bark && rule.bark.is_enabled">
-                      <div class="flex items-center space-x-1.5 truncate max-w-xs">
-                        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-400"></i>
-                        <span>Bark:</span>
+                      <div class="flex items-center space-x-1.5 truncate max-w-full sm:max-w-xs">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+                        <span class="shrink-0">Bark:</span>
                         <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="rule.bark.sound || (lang === 'zh' ? '默认铃声' : 'Default')"></span>
                         <span class="truncate text-purple-300 font-mono" x-text="rule.bark.device_key ? (lang === 'zh' ? '专属 Key' : 'Dedicated Key') : (lang === 'zh' ? '继承全局' : 'Global')"></span>
                       </div>
@@ -700,7 +779,7 @@
                   </div>
 
                   <template x-if="rule.debounce_seconds && rule.debounce_seconds > 0">
-                    <span class="inline-flex items-center justify-center px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-medium leading-none space-x-1" :title="lang === 'zh' ? '防抖冷却：触发一次后防抖期内不发送，新消息会重置防抖时间' : 'Debounce enabled'">
+                    <span class="inline-flex items-center justify-center px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-medium leading-none space-x-1 shrink-0" :title="lang === 'zh' ? '防抖冷却：触发一次后防抖期内不发送，新消息会重置防抖时间' : 'Debounce enabled'">
                       <i data-lucide="timer" class="w-3 h-3"></i>
                       <span x-text="(lang === 'zh' ? '防抖 ' : 'Debounce ') + formatDebounceHint(rule.debounce_seconds)"></span>
                     </span>
@@ -715,57 +794,57 @@
     </div>
 
     <!-- Tab 2: 定时待办提醒面板 -->
-    <div x-show="currentTab === 'scheduled_todos'" class="space-y-6" x-cloak>
+    <div x-show="currentTab === 'scheduled_todos'" class="space-y-5 sm:space-y-6" x-cloak>
       
-      <!-- 待办控制台顶部统计卡片 -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 待办控制台顶部统计卡片 (移动端 2x2 宫格排列) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <!-- 全部待办 -->
-        <div @click="todoFilter = 'all'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-indigo-500/50" :class="todoFilter === 'all' ? 'border-indigo-500 bg-indigo-500/5 ring-1 ring-indigo-500/30' : 'border-brand-border'">
+        <div @click="todoFilter = 'all'" class="p-3.5 sm:p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-indigo-500/50" :class="todoFilter === 'all' ? 'border-indigo-500 bg-indigo-500/5 ring-1 ring-indigo-500/30' : 'border-brand-border'">
           <div class="flex items-center justify-between">
-            <div class="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <i data-lucide="layers" class="w-5 h-5"></i>
+            <div class="p-2 sm:p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 shrink-0">
+              <i data-lucide="layers" class="w-4 h-4 sm:w-5 sm:h-5"></i>
             </div>
-            <span class="text-2xl font-bold text-white font-mono" x-text="todos.length"></span>
+            <span class="text-xl sm:text-2xl font-bold text-white font-mono" x-text="todos.length"></span>
           </div>
-          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_all_todos')"></div>
+          <div class="mt-2 sm:mt-3 text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate" x-text="t('stat_all_todos')"></div>
         </div>
 
         <!-- 等待到期 -->
-        <div @click="todoFilter = 'pending'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-blue-500/50" :class="todoFilter === 'pending' ? 'border-blue-500 bg-blue-500/5 ring-1 ring-blue-500/30' : 'border-brand-border'">
+        <div @click="todoFilter = 'pending'" class="p-3.5 sm:p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-blue-500/50" :class="todoFilter === 'pending' ? 'border-blue-500 bg-blue-500/5 ring-1 ring-blue-500/30' : 'border-brand-border'">
           <div class="flex items-center justify-between">
-            <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
-              <i data-lucide="clock" class="w-5 h-5"></i>
+            <div class="p-2 sm:p-2.5 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
+              <i data-lucide="clock" class="w-4 h-4 sm:w-5 sm:h-5"></i>
             </div>
-            <span class="text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'pending' && t.is_enabled).length"></span>
+            <span class="text-xl sm:text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'pending' && t.is_enabled).length"></span>
           </div>
-          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_pending_todos')"></div>
+          <div class="mt-2 sm:mt-3 text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate" x-text="t('stat_pending_todos')"></div>
         </div>
 
         <!-- 待手动确认 (催办中) -->
-        <div @click="todoFilter = 'pending_confirm'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-amber-500/50 relative overflow-hidden" :class="todoFilter === 'pending_confirm' ? 'border-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30' : 'border-brand-border'">
+        <div @click="todoFilter = 'pending_confirm'" class="p-3.5 sm:p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-amber-500/50 relative overflow-hidden" :class="todoFilter === 'pending_confirm' ? 'border-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30' : 'border-brand-border'">
           <template x-if="pendingConfirmCount > 0">
-            <span class="absolute top-0 right-0 w-10 h-10 bg-amber-500/20 rounded-bl-full flex items-start justify-end p-1.5 text-amber-400">
-              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span class="absolute top-0 right-0 w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/20 rounded-bl-full flex items-start justify-end p-1 sm:p-1.5 text-amber-400">
+              <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 animate-ping"></span>
             </span>
           </template>
           <div class="flex items-center justify-between">
-            <div class="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
-              <i data-lucide="bell-ring" class="w-5 h-5"></i>
+            <div class="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
+              <i data-lucide="bell-ring" class="w-4 h-4 sm:w-5 sm:h-5"></i>
             </div>
-            <span class="text-2xl font-bold text-white font-mono" :class="pendingConfirmCount > 0 ? 'text-amber-400' : ''" x-text="pendingConfirmCount"></span>
+            <span class="text-xl sm:text-2xl font-bold text-white font-mono" :class="pendingConfirmCount > 0 ? 'text-amber-400' : ''" x-text="pendingConfirmCount"></span>
           </div>
-          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_confirming_todos')"></div>
+          <div class="mt-2 sm:mt-3 text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate" x-text="t('stat_confirming_todos')"></div>
         </div>
 
         <!-- 已完成 -->
-        <div @click="todoFilter = 'completed'" class="p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-emerald-500/50" :class="todoFilter === 'completed' ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'border-brand-border'">
+        <div @click="todoFilter = 'completed'" class="p-3.5 sm:p-5 bg-brand-card border rounded-2xl cursor-pointer transition shadow-lg hover:border-emerald-500/50" :class="todoFilter === 'completed' ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'border-brand-border'">
           <div class="flex items-center justify-between">
-            <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            <div class="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+              <i data-lucide="check-circle-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
             </div>
-            <span class="text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'completed').length"></span>
+            <span class="text-xl sm:text-2xl font-bold text-white font-mono" x-text="todos.filter(t => t.status === 'completed').length"></span>
           </div>
-          <div class="mt-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" x-text="t('stat_completed_todos')"></div>
+          <div class="mt-2 sm:mt-3 text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate" x-text="t('stat_completed_todos')"></div>
         </div>
       </div>
 
@@ -774,13 +853,13 @@
         
         <!-- 左栏：定时待办默认通知渠道配置 (Webhook & Bark) (1/3 宽度) -->
         <div class="lg:col-span-1 space-y-6">
-          <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center space-x-2">
                 <i data-lucide="bell" class="w-5 h-5 text-indigo-400"></i>
                 <h2 class="text-md font-bold text-white" x-text="t('card_todo_channels')"></h2>
               </div>
-              <button type="button" @click="openHelpModal('todo')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1" :title="t('modal_help_title')">
+              <button type="button" @click="openHelpModal('todo')" class="px-2 py-1 text-[11px] bg-brand-border hover:bg-indigo-600/20 text-indigo-400 rounded transition flex items-center space-x-1 shrink-0" :title="t('modal_help_title')">
                 <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
                 <span x-text="lang === 'zh' ? '占位符说明' : 'Placeholders'"></span>
               </button>
@@ -826,11 +905,11 @@
             <div x-show="todoChannelTab === 'webhook'" class="space-y-4 pt-1">
               <!-- 启用开关 -->
               <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-                <div>
+                <div class="pr-2">
                   <span class="text-xs font-semibold text-gray-200 block" x-text="t('lbl_todo_webhook_enabled')"></span>
-                  <span class="text-[11px] text-gray-500" x-text="t('desc_todo_webhook')"></span>
+                  <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="t('desc_todo_webhook')"></span>
                 </div>
-                <button type="button" @click="todoWebhook.is_enabled = !todoWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                <button type="button" @click="todoWebhook.is_enabled = !todoWebhook.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                         :class="todoWebhook.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                   <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                        :class="todoWebhook.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -856,16 +935,16 @@
                 <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_timeout')"></label>
                 <input type="number" x-model.number="todoWebhook.timeout" min="1" max="60" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white transition">
               </div>
-              <div class="grid grid-cols-2 gap-4 pt-2">
-                <button type="button" @click="testWebhook('todo')" :disabled="testingTodoWebhook" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                  <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingTodoWebhook"></i>
-                  <span x-show="!testingTodoWebhook" x-text="t('btn_test_conn')"></span>
-                  <span x-show="testingTodoWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+                <button type="button" @click="testWebhook('todo')" :disabled="testingTodoWebhook" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="play" class="w-4 h-4 text-indigo-400 shrink-0" x-show="!testingTodoWebhook"></i>
+                  <span x-show="!testingTodoWebhook" x-text="t('btn_test_conn')" class="truncate"></span>
+                  <span x-show="testingTodoWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
                 </button>
-                <button type="button" @click="saveTodoWebhook()" :disabled="savingTodoWebhook" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                  <i data-lucide="save" class="w-4 h-4" x-show="!savingTodoWebhook"></i>
-                  <span x-show="!savingTodoWebhook" x-text="t('btn_save_config')"></span>
-                  <span x-show="savingTodoWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <button type="button" @click="saveTodoWebhook()" :disabled="savingTodoWebhook" class="py-2 px-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="save" class="w-4 h-4 shrink-0" x-show="!savingTodoWebhook"></i>
+                  <span x-show="!savingTodoWebhook" x-text="t('btn_save_config')" class="truncate"></span>
+                  <span x-show="savingTodoWebhook" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
                 </button>
               </div>
             </div>
@@ -873,11 +952,11 @@
             <!-- Bark 表单 -->
             <div x-show="todoChannelTab === 'bark'" class="space-y-4 pt-1">
               <div class="flex items-center justify-between py-2 border-b border-brand-border/60">
-                <div>
+                <div class="pr-2">
                   <span class="text-xs font-semibold text-gray-200 block" x-text="lang === 'zh' ? '启用待办 Bark 默认提醒' : 'Enable Todo Default Bark Alert'"></span>
-                  <span class="text-[11px] text-gray-500" x-text="lang === 'zh' ? '待办到期或催办时默认向 Bark 发送通知提醒' : 'Push alerts to Bark when scheduled todos are due'"></span>
+                  <span class="text-[11px] text-gray-500 leading-tight block mt-0.5" x-text="lang === 'zh' ? '待办到期或催办时默认向 Bark 发送通知提醒' : 'Push alerts to Bark when scheduled todos are due'"></span>
                 </div>
-                <button type="button" @click="todoBark.is_enabled = !todoBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none"
+                <button type="button" @click="todoBark.is_enabled = !todoBark.is_enabled" class="w-10 h-6 flex items-center rounded-full p-0.5 duration-300 transition-colors focus:outline-none shrink-0"
                         :class="todoBark.is_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
                   <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300"
                        :class="todoBark.is_enabled ? 'translate-x-4' : 'translate-x-0'"></div>
@@ -926,16 +1005,16 @@
                 <input type="text" x-model="todoBark.url" placeholder="https://..." class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white font-mono transition">
               </div>
 
-              <div class="grid grid-cols-2 gap-4 pt-2">
-                <button type="button" @click="testBark('todo')" :disabled="testingTodoBark" class="py-2 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                  <i data-lucide="play" class="w-4 h-4 text-indigo-400" x-show="!testingTodoBark"></i>
-                  <span x-show="!testingTodoBark" x-text="lang === 'zh' ? '测试待办 Bark' : 'Test Todo Bark'"></span>
-                  <span x-show="testingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <div class="grid grid-cols-2 gap-2.5 sm:gap-4 pt-2">
+                <button type="button" @click="testBark('todo')" :disabled="testingTodoBark" class="py-2 px-2 sm:px-4 bg-brand-border/60 hover:bg-brand-border text-white hover:text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="play" class="w-4 h-4 text-indigo-400 shrink-0" x-show="!testingTodoBark"></i>
+                  <span x-show="!testingTodoBark" x-text="lang === 'zh' ? '测试待办 Bark' : 'Test Todo Bark'" class="truncate"></span>
+                  <span x-show="testingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
                 </button>
-                <button type="button" @click="saveTodoBark()" :disabled="savingTodoBark" class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
-                  <i data-lucide="save" class="w-4 h-4" x-show="!savingTodoBark"></i>
-                  <span x-show="!savingTodoBark" x-text="t('btn_save_bark')"></span>
-                  <span x-show="savingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <button type="button" @click="saveTodoBark()" :disabled="savingTodoBark" class="py-2 px-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 sm:space-x-2 shadow-sm disabled:opacity-50">
+                  <i data-lucide="save" class="w-4 h-4 shrink-0" x-show="!savingTodoBark"></i>
+                  <span x-show="!savingTodoBark" x-text="t('btn_save_bark')" class="truncate"></span>
+                  <span x-show="savingTodoBark" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
                 </button>
               </div>
             </div>
@@ -944,19 +1023,19 @@
 
         <!-- 右栏：待办任务列表 (2/3 宽度) -->
         <div class="lg:col-span-2 space-y-6">
-          <div class="bg-brand-card border border-brand-border rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="bg-brand-card border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl space-y-5 sm:space-y-6">
         <div class="space-y-4">
           <!-- 头部标题与新建按钮 -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div class="flex items-center space-x-2">
                 <i data-lucide="calendar-check" class="w-5 h-5 text-indigo-400"></i>
-                <h2 class="text-lg font-bold text-white" x-text="t('card_todos')"></h2>
+                <h2 class="text-base sm:text-lg font-bold text-white" x-text="t('card_todos')"></h2>
               </div>
               <p class="text-xs text-gray-400 mt-1" x-text="t('todo_desc')"></p>
             </div>
 
-            <button type="button" @click="openTodoModal()" class="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2 shrink-0 whitespace-nowrap self-start sm:self-auto">
+            <button type="button" @click="openTodoModal()" class="px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5 sm:space-x-2 shrink-0 whitespace-nowrap self-start sm:self-auto">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span x-text="t('btn_new_todo')"></span>
             </button>
@@ -994,12 +1073,12 @@
           </template>
 
           <template x-for="todo in filteredTodos" :key="todo.id">
-            <div class="border rounded-2xl p-5 bg-brand-dark/30 transition-all space-y-4 relative"
+            <div class="border rounded-2xl p-4 sm:p-5 bg-brand-dark/30 transition-all space-y-3.5 sm:space-y-4 relative"
                  :class="!todo.is_enabled ? 'opacity-60 border-brand-border' : todo.status === 'pending_confirm' ? 'border-amber-500/60 bg-amber-500/5 ring-1 ring-amber-500/20' : todo.status === 'completed' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-brand-border hover:border-brand-border/90'">
               
               <!-- 顶部状态栏与标题 -->
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                   <!-- 状态徽章 -->
                   <template x-if="!todo.is_enabled">
                     <span class="inline-flex items-center justify-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20 font-medium leading-none whitespace-nowrap">
@@ -1055,14 +1134,14 @@
                   </template>
 
                   <!-- 标题 -->
-                  <h3 class="text-base font-bold text-white tracking-wide ml-1 truncate" x-text="todo.title"></h3>
+                  <h3 class="text-sm sm:text-base font-bold text-white tracking-wide break-words mt-1 sm:mt-0 w-full sm:w-auto" x-text="todo.title"></h3>
                 </div>
 
                 <!-- 右侧操作栏 -->
-                <div class="flex items-center space-x-2 shrink-0 self-start sm:self-auto">
+                <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0 self-start sm:self-auto flex-wrap gap-y-2">
                   <!-- 手动确认完成按钮 (仅在待确认状态或未完成时突出展示) -->
                   <template x-if="todo.status === 'pending_confirm'">
-                    <button type="button" @click="completeTodo(todo.id)" class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition inline-flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 active:scale-95 whitespace-nowrap shrink-0">
+                    <button type="button" @click="completeTodo(todo.id)" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition inline-flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 active:scale-95 whitespace-nowrap shrink-0">
                       <i data-lucide="check" class="w-4 h-4 shrink-0"></i>
                       <span x-text="t('btn_complete_todo')" class="whitespace-nowrap leading-none"></span>
                     </button>
@@ -1070,7 +1149,7 @@
 
                   <!-- 已完成任务重置激活按纽 -->
                   <template x-if="todo.status === 'completed'">
-                    <button type="button" @click="openResetTodoModal(todo)" class="px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-indigo-400 hover:text-white rounded-lg text-xs font-medium transition inline-flex items-center justify-center space-x-1.5 whitespace-nowrap shrink-0" :title="t('btn_reactivate_todo')">
+                    <button type="button" @click="openResetTodoModal(todo)" class="px-2.5 sm:px-3 py-1.5 bg-brand-border hover:bg-brand-border/80 text-indigo-400 hover:text-white rounded-lg text-xs font-medium transition inline-flex items-center justify-center space-x-1 whitespace-nowrap shrink-0" :title="t('btn_reactivate_todo')">
                       <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 shrink-0"></i>
                       <span x-text="t('btn_reactivate_todo')" class="whitespace-nowrap leading-none"></span>
                     </button>
@@ -1108,7 +1187,7 @@
               </div>
 
               <!-- 时间详情与剩余倒计时卡片 -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-brand-dark/50 p-4 rounded-xl border border-brand-border/60">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-xs bg-brand-dark/50 p-3 sm:p-4 rounded-xl border border-brand-border/60">
                 <!-- 目标时间与倒计时 -->
                 <div class="space-y-1.5">
                   <div class="flex items-center space-x-2 text-gray-400">
@@ -1133,19 +1212,19 @@
                 </div>
 
                 <!-- Webhook, Bark 与时间记录 -->
-                <div class="space-y-1.5">
-                  <div class="flex items-center space-x-2 text-gray-400 truncate">
+                <div class="space-y-1.5 min-w-0">
+                  <div class="flex items-center space-x-2 text-gray-400 truncate max-w-full">
                     <i data-lucide="link" class="w-4 h-4 text-indigo-400 shrink-0"></i>
                     <span class="font-medium shrink-0">Webhook:</span>
                     <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="todo.webhook && todo.webhook.url ? (todo.webhook.method || 'POST') : (lang === 'zh' ? '待办默认' : 'Todo Default')"></span>
-                    <span class="truncate text-indigo-300 font-mono" x-text="(todo.webhook && todo.webhook.url) ? todo.webhook.url : (todoWebhook.url || (lang === 'zh' ? '未配置待办默认 Webhook' : 'No Todo Webhook'))"></span>
+                    <span class="truncate text-indigo-300 font-mono max-w-full" x-text="(todo.webhook && todo.webhook.url) ? todo.webhook.url : (todoWebhook.url || (lang === 'zh' ? '未配置待办默认 Webhook' : 'No Todo Webhook'))"></span>
                   </div>
                   <template x-if="todo.bark && todo.bark.is_enabled">
-                    <div class="flex items-center space-x-2 text-gray-400 truncate">
+                    <div class="flex items-center space-x-2 text-gray-400 truncate max-w-full">
                       <i data-lucide="smartphone" class="w-4 h-4 text-purple-400 shrink-0"></i>
                       <span class="font-medium shrink-0">Bark:</span>
                       <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] uppercase font-bold leading-none shrink-0" x-text="todo.bark.sound || (lang === 'zh' ? '默认铃声' : 'Default')"></span>
-                      <span class="truncate text-purple-300 font-mono" x-text="todo.bark.device_key ? (lang === 'zh' ? '专属 Key' : 'Dedicated Key') : (todoBark.device_key || globalBark.device_key ? (lang === 'zh' ? '待办默认' : 'Todo Default') : (lang === 'zh' ? '未配置' : 'Not Configured'))"></span>
+                      <span class="truncate text-purple-300 font-mono max-w-full" x-text="todo.bark.device_key ? (lang === 'zh' ? '专属 Key' : 'Dedicated Key') : (todoBark.device_key || globalBark.device_key ? (lang === 'zh' ? '待办默认' : 'Todo Default') : (lang === 'zh' ? '未配置' : 'Not Configured'))"></span>
                     </div>
                   </template>
                   <div class="flex items-center space-x-4 text-gray-500 text-[11px]">
@@ -1172,17 +1251,17 @@
   </main>
 
   <!-- 模态框 1：Telegram 账号登录 -->
-  <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeLoginModal()">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+  <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto" @click.self="closeLoginModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl relative my-auto">
       <button type="button" @click="closeLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
-      <h3 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+      <h3 class="text-base sm:text-lg font-bold text-white mb-2 flex items-center space-x-2">
         <i data-lucide="send" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="isRelogin ? t('modal_relogin_title') : t('modal_login_title')"></span>
       </h3>
-      <p class="text-xs text-gray-400 mb-6" x-text="isRelogin ? (lang === 'zh' ? '正在为离线账号重新获取授权，请核对信息并获取验证码。' : 'Re-authorizing offline account. Please verify credentials and get verification code.') : (lang === 'zh' ? '请输入 Telegram API 凭据进行交互式连接，登录凭据将加密保存在本地安全 Session 中。' : 'Please input Telegram API credentials for interactive authorization. Session will be securely stored in the local server.')"></p>
+      <p class="text-xs text-gray-400 mb-5 sm:mb-6" x-text="isRelogin ? (lang === 'zh' ? '正在为离线账号重新获取授权，请核对信息并获取验证码。' : 'Re-authorizing offline account. Please verify credentials and get verification code.') : (lang === 'zh' ? '请输入 Telegram API 凭据进行交互式连接，登录凭据将加密保存在本地安全 Session 中。' : 'Please input Telegram API credentials for interactive authorization. Session will be securely stored in the local server.')"></p>
 
       <div class="space-y-4">
         <!-- 错误提示 -->
@@ -1196,7 +1275,7 @@
             <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_phone')"></label>
             <input type="text" x-model="loginForm.phone" placeholder="+8613800000000" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API ID</label>
               <input type="number" x-model.number="loginForm.api_id" placeholder="123456" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
@@ -1259,13 +1338,13 @@
   </div>
 
   <!-- 模态框 2：规则添加/编辑 -->
-  <div x-show="showRuleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeRuleModal()">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+  <div x-show="showRuleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm" @click.self="closeRuleModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-4 sm:p-6 shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] overflow-y-auto my-auto">
       <button type="button" @click="closeRuleModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
-      <h3 class="text-lg font-bold text-white mb-6 flex items-center space-x-2">
+      <h3 class="text-base sm:text-lg font-bold text-white mb-5 sm:mb-6 flex items-center space-x-2">
         <i data-lucide="shield-alert" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="ruleForm.isEdit ? (lang === 'zh' ? '编辑监控规则' : 'Edit Monitoring Rule') : (lang === 'zh' ? '创建监控规则' : 'Create Monitoring Rule')"></span>
       </h3>
@@ -1530,25 +1609,25 @@
   </div>
 
   <!-- 占位符帮助说明弹窗 -->
-  <div x-show="showHelpModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showHelpModal = false">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+  <div x-show="showHelpModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="showHelpModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-4 sm:p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto my-auto">
       <button type="button" @click="showHelpModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
       <!-- 弹窗标题 -->
-      <h3 class="text-md font-bold text-white mb-3 flex items-center space-x-2">
+      <h3 class="text-sm sm:text-md font-bold text-white mb-3 flex items-center space-x-2">
         <i data-lucide="help-circle" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="helpModalTab === 'todo' ? t('modal_help_title_todo') : t('modal_help_title_tg')"></span>
       </h3>
 
       <!-- 分类切换 Tab 按钮组 -->
-      <div class="flex items-center space-x-2 border-b border-brand-border pb-3 mb-4">
-        <button type="button" @click="helpModalTab = 'tg'" :class="helpModalTab === 'tg' ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20' : 'text-gray-400 hover:text-white bg-brand-dark border border-brand-border'" class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5">
+      <div class="flex items-center space-x-2 border-b border-brand-border pb-3 mb-4 overflow-x-auto max-w-full">
+        <button type="button" @click="helpModalTab = 'tg'" :class="helpModalTab === 'tg' ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20' : 'text-gray-400 hover:text-white bg-brand-dark border border-brand-border'" class="px-3 sm:px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5 whitespace-nowrap shrink-0">
           <i data-lucide="radio" class="w-3.5 h-3.5"></i>
           <span x-text="lang === 'zh' ? 'TG 消息监控 & 下线告警' : 'TG Monitor & Offline'"></span>
         </button>
-        <button type="button" @click="helpModalTab = 'todo'" :class="helpModalTab === 'todo' ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20' : 'text-gray-400 hover:text-white bg-brand-dark border border-brand-border'" class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5">
+        <button type="button" @click="helpModalTab = 'todo'" :class="helpModalTab === 'todo' ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20' : 'text-gray-400 hover:text-white bg-brand-dark border border-brand-border'" class="px-3 sm:px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5 whitespace-nowrap shrink-0">
           <i data-lucide="calendar-check" class="w-3.5 h-3.5"></i>
           <span x-text="lang === 'zh' ? '定时待办提醒' : 'Scheduled Todos'"></span>
         </button>
@@ -1558,8 +1637,8 @@
       <template x-if="helpModalTab === 'tg'">
         <div>
           <p class="text-xs text-gray-400 mb-4 leading-relaxed" x-text="t('help_desc_tg')"></p>
-          <div class="border border-brand-border rounded-xl overflow-hidden text-xs bg-brand-dark/30">
-            <table class="w-full text-left border-collapse">
+          <div class="border border-brand-border rounded-xl overflow-hidden text-xs bg-brand-dark/30 overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[500px]">
               <thead>
                 <tr class="bg-brand-border/30 text-gray-300 font-bold border-b border-brand-border">
                   <th class="p-3 w-1/3" x-text="t('lbl_placeholder_th')"></th>
@@ -1638,8 +1717,8 @@
       <template x-if="helpModalTab === 'todo'">
         <div>
           <p class="text-xs text-gray-400 mb-4 leading-relaxed" x-text="t('help_desc_todo')"></p>
-          <div class="border border-brand-border rounded-xl overflow-hidden text-xs bg-brand-dark/30">
-            <table class="w-full text-left border-collapse">
+          <div class="border border-brand-border rounded-xl overflow-hidden text-xs bg-brand-dark/30 overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[500px]">
               <thead>
                 <tr class="bg-brand-border/30 text-gray-300 font-bold border-b border-brand-border">
                   <th class="p-3 w-1/3" x-text="t('lbl_placeholder_th')"></th>
@@ -1691,18 +1770,18 @@
   </div>
 
   <!-- Webhook 测试结果诊断弹窗 -->
-  <div x-show="showTestResultModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showTestResultModal = false">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
+  <div x-show="showTestResultModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="showTestResultModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-4 sm:p-6 shadow-2xl relative my-auto">
       <button type="button" @click="showTestResultModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
+      <h3 class="text-sm sm:text-md font-bold text-white mb-4 flex items-center space-x-2">
         <i data-lucide="terminal" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="t('modal_test_title')"></span>
       </h3>
 
       <div class="space-y-4 text-xs">
-        <div class="p-4 rounded-xl border flex items-center justify-between"
+        <div class="p-3.5 sm:p-4 rounded-xl border flex items-center justify-between"
              :class="testResult.status === 'success' ? (testResult.code >= 200 && testResult.code < 300 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400') : 'bg-red-500/10 border-red-500/20 text-red-400'">
           <div>
             <div class="flex items-center space-x-1.5">
@@ -1713,7 +1792,7 @@
               <span x-text="t('lbl_http_code')"></span>: <span class="font-bold text-white" x-text="testResult.code || '无'"></span> | <span x-text="lang === 'zh' ? '响应耗时' : 'Latency'"></span>: <span class="font-bold text-white" x-text="testResult.elapsed + ' ms'"></span>
             </span>
           </div>
-          <div class="text-2xl font-bold font-mono" x-text="testResult.code || 'ERROR'"></div>
+          <div class="text-xl sm:text-2xl font-bold font-mono" x-text="testResult.code || 'ERROR'"></div>
         </div>
 
         <div x-show="testResult.status === 'success'" class="space-y-2">
@@ -1726,19 +1805,19 @@
           <pre class="w-full p-3 bg-brand-dark rounded-lg border border-brand-border text-red-300 overflow-x-auto max-h-48 font-mono select-text" x-text="testResult.error"></pre>
         </div>
       </div>
-      <div class="mt-6 flex justify-end">
+      <div class="mt-5 sm:mt-6 flex justify-end">
         <button type="button" @click="showTestResultModal = false" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-white rounded-lg text-xs font-semibold transition" x-text="lang === 'zh' ? '关闭窗口' : 'Close'"></button>
       </div>
     </div>
   </div>
 
   <!-- 修改管理员密码模态框 -->
-  <div x-show="showPwdModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showPwdModal = false">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
+  <div x-show="showPwdModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="showPwdModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-5 sm:p-6 shadow-2xl relative my-auto" @click.stop>
       <button type="button" @click="showPwdModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <h3 class="text-md font-bold text-white mb-4 flex items-center space-x-2">
+      <h3 class="text-base sm:text-md font-bold text-white mb-4 flex items-center space-x-2">
         <i data-lucide="shield-check" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="t('modal_pwd_title')"></span>
       </h3>
@@ -1751,7 +1830,7 @@
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2" x-text="t('lbl_new_pwd')"></label>
           <input type="password" x-model="pwdForm.new_password" :placeholder="lang === 'zh' ? '请输入新密码...' : 'Enter new password...'" class="w-full px-3 py-2 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-lg text-sm text-white">
         </div>
-        <button type="button" @click="changeAdminPassword()" :disabled="changingPwd" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
+        <button type="button" @click="changeAdminPassword()" :disabled="changingPwd" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-sm flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50">
           <i data-lucide="check" class="w-4 h-4" x-show="!changingPwd"></i>
           <span x-show="!changingPwd" x-text="t('btn_confirm_pwd')"></span>
           <span x-show="changingPwd" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -1761,19 +1840,19 @@
   </div>
 
   <!-- 模态框：新建 / 编辑 定时待办提醒 -->
-  <div x-show="showTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeTodoModal()">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-xl p-6 shadow-2xl relative my-8" @click.stop>
+  <div x-show="showTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeTodoModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-xl p-4 sm:p-6 shadow-2xl relative my-4 sm:my-8" @click.stop>
       <button type="button" @click="closeTodoModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
-      <h3 class="text-lg font-bold text-white mb-1 flex items-center space-x-2">
+      <h3 class="text-base sm:text-lg font-bold text-white mb-1 flex items-center space-x-2">
         <i data-lucide="calendar-clock" class="w-5 h-5 text-indigo-400"></i>
         <span x-text="todoForm.isEdit ? t('modal_edit_todo_title') : t('modal_new_todo_title')"></span>
       </h3>
-      <p class="text-xs text-gray-400 mb-5" x-text="t('todo_desc')"></p>
+      <p class="text-xs text-gray-400 mb-4 sm:mb-5" x-text="t('todo_desc')"></p>
 
-      <div class="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+      <div class="space-y-4 max-h-[70vh] sm:max-h-[75vh] overflow-y-auto pr-1">
         <!-- 待办标题 -->
         <div>
           <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
@@ -2126,8 +2205,8 @@
   </div>
 
   <!-- 模态框：重置并重新激活待办 -->
-  <div x-show="showResetTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="showResetTodoModal = false">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-6 shadow-2xl relative" @click.stop>
+  <div x-show="showResetTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm" @click.self="showResetTodoModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-4 sm:p-6 shadow-2xl relative" @click.stop>
       <button type="button" @click="showResetTodoModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
@@ -2151,8 +2230,8 @@
   </div>
 
   <!-- 模态框：系统版本与在线更新 -->
-  <div x-show="showUpdateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="showUpdateModal = false">
-    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-6 shadow-2xl relative my-8" @click.stop>
+  <div x-show="showUpdateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="showUpdateModal = false">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-lg p-4 sm:p-6 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto" @click.stop>
       <button type="button" @click="showUpdateModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
@@ -2266,7 +2345,7 @@
       </div>
 
       <!-- 底部按纽栏 -->
-      <div class="mt-6 flex items-center justify-between pt-3 border-t border-brand-border">
+      <div class="mt-4 sm:mt-6 flex items-center justify-between pt-3 border-t border-brand-border flex-wrap gap-2">
         <button type="button" @click="checkSystemUpdate(true)" :disabled="checkingUpdate || updatingSystem" class="px-3.5 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition disabled:opacity-50 flex items-center space-x-1.5">
           <span :class="checkingUpdate ? 'animate-spin inline-block' : 'inline-block'">
             <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
@@ -2289,7 +2368,7 @@
   </div>
 
   <!-- Toast 提示弹出框 -->
-  <div class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none">
+  <div class="fixed bottom-5 right-4 sm:right-5 left-4 sm:left-auto z-50 space-y-2 pointer-events-none max-w-sm ml-auto">
     <template x-for="toast in toasts" :key="toast.id">
       <div class="px-4 py-3 bg-brand-card border border-brand-border text-white rounded-xl shadow-xl flex items-center space-x-3 transform translate-y-0 transition duration-300 pointer-events-auto">
         <span class="w-2 h-2 rounded-full" :class="toast.type === 'success' ? 'bg-emerald-400' : toast.type === 'error' ? 'bg-red-400' : 'bg-indigo-400'"></span>
