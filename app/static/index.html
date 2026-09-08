@@ -145,6 +145,11 @@
             <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
             <span x-text="t('btn_pwd')"></span>
           </button>
+          <!-- 备份与恢复按钮 -->
+          <button type="button" @click="openBackupModal()" class="px-3 py-1.5 bg-brand-border/40 hover:bg-brand-border hover:text-white text-indigo-400 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 shrink-0" :title="t('btn_backup')">
+            <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+            <span x-text="t('btn_backup')"></span>
+          </button>
         </div>
 
         <!-- 刷新数据按钮 (全端通用) -->
@@ -207,6 +212,13 @@
                     class="w-full px-3 py-2 text-left text-gray-300 hover:bg-brand-dark/80 rounded-xl transition flex items-center space-x-2 text-xs">
               <i data-lucide="key-round" class="w-4 h-4 text-indigo-400"></i>
               <span x-text="t('btn_pwd')"></span>
+            </button>
+
+            <!-- 备份与恢复配置 -->
+            <button type="button" @click="openBackupModal(); open = false;" 
+                    class="w-full px-3 py-2 text-left text-gray-300 hover:bg-brand-dark/80 rounded-xl transition flex items-center space-x-2 text-xs">
+              <i data-lucide="archive" class="w-4 h-4 text-indigo-400"></i>
+              <span x-text="t('btn_backup')"></span>
             </button>
           </div>
         </div>
@@ -1839,6 +1851,240 @@
     </div>
   </div>
 
+  <!-- 模态框：配置备份与导入 -->
+  <div x-show="showBackupModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeBackupModal()">
+    <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-2xl p-5 sm:p-7 shadow-2xl relative my-4 sm:my-8" @click.stop>
+      <button type="button" @click="closeBackupModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <!-- 弹窗标题 -->
+      <div class="flex items-center space-x-3 mb-1">
+        <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
+          <i data-lucide="archive" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-white" x-text="t('modal_backup_title')"></h3>
+          <p class="text-xs text-gray-400 mt-0.5" x-text="t('modal_backup_desc')"></p>
+        </div>
+      </div>
+
+      <!-- 顶部分段控制器：导出备份 vs 导入恢复 -->
+      <div class="flex items-center space-x-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border mt-4 mb-5">
+        <button type="button" @click="backupActiveTab = 'export'; $nextTick(() => lucide.createIcons())"
+                :class="backupActiveTab === 'export' ? 'bg-indigo-600 text-white shadow-md font-semibold' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2 text-xs rounded-lg transition flex items-center justify-center space-x-2">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span x-text="t('tab_backup_export')"></span>
+        </button>
+        <button type="button" @click="backupActiveTab = 'import'; $nextTick(() => lucide.createIcons())"
+                :class="backupActiveTab === 'import' ? 'bg-indigo-600 text-white shadow-md font-semibold' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2 text-xs rounded-lg transition flex items-center justify-center space-x-2">
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          <span x-text="t('tab_backup_import')"></span>
+        </button>
+      </div>
+
+      <!-- Tab 1: 导出备份 -->
+      <div x-show="backupActiveTab === 'export'" class="space-y-4">
+        <!-- 导出选项卡片 1：JSON 配置 -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border hover:border-indigo-500/40 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start space-x-3 min-w-0">
+            <div class="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl shrink-0 mt-0.5">
+              <i data-lucide="file-code" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-sm font-semibold text-white flex items-center space-x-2">
+                <span x-text="t('card_export_json_title')"></span>
+                <span class="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full border border-indigo-500/20 font-mono">.json</span>
+              </h4>
+              <p class="text-xs text-gray-400 mt-1 leading-relaxed" x-text="t('card_export_json_desc')"></p>
+            </div>
+          </div>
+          <button type="button" @click="downloadBackup('json')" :disabled="exportingBackup"
+                  class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition font-medium text-xs flex items-center justify-center space-x-2 shrink-0 shadow-sm disabled:opacity-50">
+            <i data-lucide="download" class="w-4 h-4" x-show="!exportingBackup"></i>
+            <span x-show="!exportingBackup" x-text="t('btn_download_json')"></span>
+            <span x-show="exportingBackup" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          </button>
+        </div>
+
+        <!-- 导出选项卡片 2：ZIP 完整包 -->
+        <div class="p-4 bg-brand-dark/60 rounded-xl border border-brand-border hover:border-indigo-500/40 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start space-x-3 min-w-0">
+            <div class="p-2.5 bg-purple-500/10 text-purple-400 rounded-xl shrink-0 mt-0.5">
+              <i data-lucide="folder-archive" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-sm font-semibold text-white flex items-center space-x-2">
+                <span x-text="t('card_export_zip_title')"></span>
+                <span class="text-[10px] px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded-full border border-purple-500/20 font-mono">.zip</span>
+              </h4>
+              <p class="text-xs text-gray-400 mt-1 leading-relaxed" x-text="t('card_export_zip_desc')"></p>
+            </div>
+          </div>
+          <button type="button" @click="downloadBackup('zip')" :disabled="exportingBackup"
+                  class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition font-medium text-xs flex items-center justify-center space-x-2 shrink-0 shadow-sm disabled:opacity-50">
+            <i data-lucide="download" class="w-4 h-4" x-show="!exportingBackup"></i>
+            <span x-show="!exportingBackup" x-text="t('btn_download_zip')"></span>
+            <span x-show="exportingBackup" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 2: 导入恢复 -->
+      <div x-show="backupActiveTab === 'import'" class="space-y-4">
+        <!-- 导入模式切换 -->
+        <div class="flex items-center space-x-4 text-xs font-semibold text-gray-300">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" value="file" x-model="backupImportMode" @change="backupPreview = null; backupError = ''; $nextTick(() => lucide.createIcons())" class="text-indigo-600 focus:ring-0">
+            <span x-text="t('lbl_import_mode_file')"></span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" value="text" x-model="backupImportMode" @change="backupPreview = null; backupError = ''; $nextTick(() => lucide.createIcons())" class="text-indigo-600 focus:ring-0">
+            <span x-text="t('lbl_import_mode_text')"></span>
+          </label>
+        </div>
+
+        <!-- 模式 A：文件上传拖拽区域 -->
+        <div x-show="backupImportMode === 'file'"
+             @dragover.prevent
+             @drop.prevent="handleBackupDrop($event)"
+             class="border-2 border-dashed border-brand-border hover:border-indigo-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-brand-dark/40 group relative"
+             @click="$refs.backupFileInput.click()">
+          <input type="file" x-ref="backupFileInput" @change="handleBackupFileSelect($event)" accept=".json,.zip" class="hidden">
+          <div class="flex flex-col items-center space-y-2">
+            <div class="p-3 bg-indigo-500/10 text-indigo-400 group-hover:text-indigo-300 rounded-2xl transition">
+              <i data-lucide="upload-cloud" class="w-7 h-7"></i>
+            </div>
+            <p class="text-xs font-semibold text-gray-200" x-text="backupFileName ? t('lbl_selected_file') + ': ' + backupFileName : t('drag_drop_hint')"></p>
+            <p class="text-[11px] text-gray-500" x-text="backupFileSize ? backupFileSize : t('drag_drop_support')"></p>
+          </div>
+        </div>
+
+        <!-- 模式 B：粘贴 JSON 内容 -->
+        <div x-show="backupImportMode === 'text'" class="space-y-2">
+          <textarea x-model="backupJsonText" rows="5"
+                    :placeholder="t('ph_paste_json')"
+                    class="w-full px-3.5 py-2.5 bg-brand-dark border border-brand-border focus:border-indigo-500 focus:outline-none rounded-xl text-xs font-mono text-gray-200 transition"></textarea>
+          <div class="flex justify-end">
+            <button type="button" @click="generateBackupPreview()" :disabled="previewingBackup || !backupJsonText.trim()"
+                    class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition font-medium text-xs flex items-center space-x-1.5 shadow-sm disabled:opacity-50">
+              <i data-lucide="search" class="w-3.5 h-3.5" x-show="!previewingBackup"></i>
+              <span x-show="!previewingBackup" x-text="t('btn_parse_json')"></span>
+              <span x-show="previewingBackup" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div x-show="backupError" x-cloak class="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start space-x-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 shrink-0 mt-0.5"></i>
+          <div>
+            <span class="font-semibold" x-text="t('preview_parse_error') + ': '"></span>
+            <span x-text="backupError"></span>
+          </div>
+        </div>
+
+        <!-- 备份内容体检预览卡片 -->
+        <div x-show="backupPreview && backupPreview.valid" x-cloak class="p-4 bg-brand-dark/70 rounded-xl border border-emerald-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <h5 class="text-xs font-semibold text-emerald-400 flex items-center space-x-1.5">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span x-text="t('preview_title')"></span>
+            </h5>
+            <span class="text-[11px] px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded-full font-mono uppercase" x-text="backupPreview.type"></span>
+          </div>
+
+          <!-- 统计网格 -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="p-2 bg-brand-card rounded-lg border border-brand-border">
+              <span class="text-gray-400 text-[11px]" x-text="t('preview_rules')"></span>
+              <p class="text-sm font-bold text-white mt-0.5" x-text="backupPreview.stats.rules_count"></p>
+            </div>
+            <div class="p-2 bg-brand-card rounded-lg border border-brand-border">
+              <span class="text-gray-400 text-[11px]" x-text="t('preview_todos')"></span>
+              <p class="text-sm font-bold text-white mt-0.5" x-text="backupPreview.stats.todos_count"></p>
+            </div>
+            <div class="p-2 bg-brand-card rounded-lg border border-brand-border">
+              <span class="text-gray-400 text-[11px]" x-text="t('preview_accounts')"></span>
+              <p class="text-sm font-bold text-white mt-0.5" x-text="backupPreview.stats.accounts_count"></p>
+            </div>
+            <div class="p-2 bg-brand-card rounded-lg border border-brand-border" x-show="backupPreview.type === 'zip'">
+              <span class="text-gray-400 text-[11px]" x-text="t('preview_sessions')"></span>
+              <p class="text-sm font-bold text-purple-400 mt-0.5" x-text="backupPreview.stats.session_files_count"></p>
+            </div>
+          </div>
+
+          <!-- 渠道支持情况小标签 -->
+          <div class="flex flex-wrap gap-1.5 text-[11px] pt-1">
+            <span class="px-2 py-0.5 rounded-md border" :class="backupPreview.stats.has_global_webhook ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300' : 'bg-brand-card border-brand-border text-gray-500'">
+              全局 Webhook: <span x-text="backupPreview.stats.has_global_webhook ? t('lbl_configured') : t('lbl_not_configured')"></span>
+            </span>
+            <span class="px-2 py-0.5 rounded-md border" :class="backupPreview.stats.has_global_bark ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-brand-card border-brand-border text-gray-500'">
+              全局 Bark: <span x-text="backupPreview.stats.has_global_bark ? t('lbl_configured') : t('lbl_not_configured')"></span>
+            </span>
+            <span class="px-2 py-0.5 rounded-md border" :class="backupPreview.stats.has_offline_webhook || backupPreview.stats.has_offline_bark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-brand-card border-brand-border text-gray-500'">
+              离线告警渠道: <span x-text="(backupPreview.stats.has_offline_webhook || backupPreview.stats.has_offline_bark) ? t('lbl_configured') : t('lbl_not_configured')"></span>
+            </span>
+            <span class="px-2 py-0.5 rounded-md border" :class="backupPreview.stats.has_todo_webhook || backupPreview.stats.has_todo_bark ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' : 'bg-brand-card border-brand-border text-gray-500'">
+              待办提醒渠道: <span x-text="(backupPreview.stats.has_todo_webhook || backupPreview.stats.has_todo_bark) ? t('lbl_configured') : t('lbl_not_configured')"></span>
+            </span>
+          </div>
+
+          <template x-if="backupPreview.stats.exported_at">
+            <p class="text-[11px] text-gray-400">
+              <span x-text="t('preview_exported_at') + ': '"></span>
+              <span class="font-mono text-gray-300" x-text="backupPreview.stats.exported_at"></span>
+            </p>
+          </template>
+
+          <template x-if="backupPreview.warnings && backupPreview.warnings.length > 0">
+            <div class="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-300 space-y-1">
+              <template x-for="w in backupPreview.warnings" :key="w">
+                <p class="flex items-center space-x-1">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span x-text="w"></span>
+                </p>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <!-- 导入安全选项 -->
+        <div class="p-3.5 bg-brand-dark/40 rounded-xl border border-brand-border space-y-2.5">
+          <label class="flex items-center space-x-2.5 cursor-pointer">
+            <input type="checkbox" x-model="preservePassword" class="rounded text-indigo-600 focus:ring-0">
+            <span class="text-xs text-gray-300" x-text="t('lbl_preserve_password')"></span>
+          </label>
+          <label class="flex items-center space-x-2.5 cursor-pointer">
+            <input type="checkbox" x-model="preserveServer" class="rounded text-indigo-600 focus:ring-0">
+            <span class="text-xs text-gray-300" x-text="t('lbl_preserve_server')"></span>
+          </label>
+          <label class="flex items-center space-x-2.5 cursor-pointer">
+            <input type="checkbox" x-model="autoReload" class="rounded text-indigo-600 focus:ring-0">
+            <span class="text-xs text-gray-300" x-text="t('lbl_auto_reload')"></span>
+          </label>
+        </div>
+
+        <!-- 提示文本 -->
+        <p class="text-[11px] text-gray-500 leading-relaxed" x-text="t('import_warning_note')"></p>
+
+        <!-- 导入操作按钮 -->
+        <div class="flex items-center justify-end space-x-3 pt-2">
+          <button type="button" @click="closeBackupModal()" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition" x-text="t('btn_cancel')"></button>
+          <button type="button" @click="executeBackupImport()" :disabled="importingBackup || (!backupFile && !backupJsonText.trim()) || (backupPreview && !backupPreview.valid)"
+                  class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition flex items-center space-x-2 shadow-sm disabled:opacity-50">
+            <i data-lucide="check" class="w-4 h-4" x-show="!importingBackup"></i>
+            <span x-show="!importingBackup" x-text="t('btn_confirm_import')"></span>
+            <span x-show="importingBackup" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- 模态框：新建 / 编辑 定时待办提醒 -->
   <div x-show="showTodoModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto" @click.self="closeTodoModal()">
     <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-xl p-4 sm:p-6 shadow-2xl relative my-4 sm:my-8" @click.stop>
@@ -2618,7 +2864,44 @@
             btn_save_bark: "保存 Bark 配置",
             lbl_override_bark: "覆盖专属 Bark 推送",
             override_bark_hint: "开启后可为此条目指定独立的 Bark Key、分组或提示铃声。",
-            modal_test_title_bark: "Bark 推送测试诊断结果"
+            modal_test_title_bark: "Bark 推送测试诊断结果",
+            // 备份与恢复
+            btn_backup: "备份与恢复",
+            modal_backup_title: "系统配置备份与导入",
+            modal_backup_desc: "支持完整业务配置导出备份与整站迁移导入，具备安全快照与防锁死防护。",
+            tab_backup_export: "导出备份",
+            tab_backup_import: "导入恢复",
+            card_export_json_title: "轻量配置备份 (.json)",
+            card_export_json_desc: "包含全部消息监控规则、定时待办、推送渠道 (Webhook & Bark) 及账号配置。纯文本格式，体积仅几 KB，直观易编辑。",
+            btn_download_json: "下载 JSON 配置文件",
+            card_export_zip_title: "完整系统迁移包 (.zip)",
+            card_export_zip_desc: "包含完整 config.json 配置文件以及 sessions/ 目录下所有 Telegram 账号登录凭证。适合服务器换机整站全量迁移，恢复后免重新扫码登录。",
+            btn_download_zip: "下载 ZIP 完整迁移包",
+            lbl_import_mode_file: "上传备份文件 (.json / .zip)",
+            lbl_import_mode_text: "粘贴 JSON 文本",
+            drag_drop_hint: "点击选取或将文件拖拽至此处",
+            drag_drop_support: "支持 .json 配置文件及 .zip 完整数据迁移包",
+            lbl_selected_file: "已选择文件",
+            lbl_preserve_password: "保留当前管理员密码 (推荐，防止导入后密码被覆盖导致无法登录)",
+            lbl_preserve_server: "保留当前服务器端口与网络绑定 (推荐，防止端口冲突)",
+            lbl_auto_reload: "导入后自动热重载生效 (实时刷新待办调度器及 Telegram 客户端监听)",
+            preview_title: "备份包体检与内容统计",
+            preview_type: "文件类型",
+            preview_rules: "监控规则",
+            preview_todos: "定时待办",
+            preview_accounts: "TG 账号",
+            preview_sessions: "Session 凭据",
+            preview_webhooks: "Webhook 渠道",
+            preview_barks: "Bark 推送渠道",
+            preview_exported_at: "备份生成时间",
+            preview_warnings: "注意事项",
+            preview_parse_error: "备份内容解析失败",
+            btn_confirm_import: "确认导入并应用配置",
+            import_warning_note: "提示：导入将覆盖现有配置。系统在导入前会自动在 backups/ 目录生成一份当前配置的快照备份（.bak），确保安全无忧。",
+            ph_paste_json: "请在此粘贴导出的备份 JSON 配置文本...",
+            btn_parse_json: "解析并预览",
+            lbl_not_configured: "未配置",
+            lbl_configured: "已配置"
           },
           en: {
             app_title: "TG Msg Monitor",
@@ -2850,8 +3133,44 @@
             btn_test_bark: "Test Bark Push",
             btn_save_bark: "Save Bark Config",
             lbl_override_bark: "Override Custom Bark Push",
-            override_bark_hint: "Enable to assign dedicated Bark Key, Group, or Sound for this item.",
-            modal_test_title_bark: "Bark Push Test Diagnostics"
+            modal_test_title_bark: "Bark Push Test Diagnostics",
+            // Backup & Restore
+            btn_backup: "Backup & Restore",
+            modal_backup_title: "System Backup & Restore",
+            modal_backup_desc: "Export configuration backups or migrate system data with safety snapshot protection.",
+            tab_backup_export: "Export Backup",
+            tab_backup_import: "Import & Restore",
+            card_export_json_title: "Application Config (.json)",
+            card_export_json_desc: "Includes all rules, scheduled todos, notification channels (Webhook & Bark) and account settings. Lightweight text format.",
+            btn_download_json: "Download JSON Config",
+            card_export_zip_title: "Full Migration Package (.zip)",
+            card_export_zip_desc: "Includes config.json and all Telegram session credentials in sessions/. Ideal for complete server migration without re-login.",
+            btn_download_zip: "Download ZIP Package",
+            lbl_import_mode_file: "Upload File (.json / .zip)",
+            lbl_import_mode_text: "Paste JSON Text",
+            drag_drop_hint: "Click to select or drag & drop file here",
+            drag_drop_support: "Supports .json config file and .zip migration package",
+            lbl_selected_file: "Selected File",
+            lbl_preserve_password: "Preserve current admin password (Recommended)",
+            lbl_preserve_server: "Preserve current server port & host binding (Recommended)",
+            lbl_auto_reload: "Auto reload & apply changes immediately",
+            preview_title: "Backup Inspection & Summary",
+            preview_type: "Type",
+            preview_rules: "Rules",
+            preview_todos: "Scheduled Todos",
+            preview_accounts: "TG Accounts",
+            preview_sessions: "Session Credentials",
+            preview_webhooks: "Webhook Channels",
+            preview_barks: "Bark Channels",
+            preview_exported_at: "Exported At",
+            preview_warnings: "Warnings",
+            preview_parse_error: "Backup Parsing Failed",
+            btn_confirm_import: "Confirm Import & Apply",
+            import_warning_note: "Note: Importing will overwrite current settings. A safety snapshot will be created automatically before applying.",
+            ph_paste_json: "Paste backup JSON configuration content here...",
+            btn_parse_json: "Parse & Preview",
+            lbl_not_configured: "Not Configured",
+            lbl_configured: "Configured"
           }
         },
         t(key) {
@@ -2951,6 +3270,23 @@
         showPwdModal: false,
         changingPwd: false,
         pwdForm: { old_password: "", new_password: "" },
+
+        // 备份与恢复变量
+        showBackupModal: false,
+        backupActiveTab: 'export', // 'export' | 'import'
+        backupImportMode: 'file', // 'file' | 'text'
+        backupFile: null,
+        backupFileName: '',
+        backupFileSize: '',
+        backupJsonText: '',
+        preservePassword: true,
+        preserveServer: true,
+        autoReload: true,
+        backupPreview: null,
+        previewingBackup: false,
+        importingBackup: false,
+        exportingBackup: false,
+        backupError: '',
 
         // 登录参数
         loginStep: 1, // 1: API信息及手机号, 2: 验证码, 3: 两步验证密码
@@ -3159,6 +3495,160 @@
           } finally {
             this.changingPwd = false;
             this.$nextTick(() => lucide.createIcons());
+          }
+        },
+
+        // --- 系统配置备份与导入 ---
+        openBackupModal() {
+          this.showBackupModal = true;
+          this.backupActiveTab = 'export';
+          this.backupError = '';
+          this.backupPreview = null;
+          this.backupFile = null;
+          this.backupFileName = '';
+          this.backupFileSize = '';
+          this.backupJsonText = '';
+          this.$nextTick(() => lucide.createIcons());
+        },
+
+        closeBackupModal() {
+          this.showBackupModal = false;
+          this.backupFile = null;
+          this.backupFileName = '';
+          this.backupFileSize = '';
+          this.backupJsonText = '';
+          this.backupPreview = null;
+          this.backupError = '';
+        },
+
+        async downloadBackup(type = 'json') {
+          this.exportingBackup = true;
+          try {
+            const res = await this.apiFetch(`/api/system/backup/export?type=${type}`);
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.detail || (this.lang === 'zh' ? '导出备份失败' : 'Export failed'));
+            }
+            const blob = await res.blob();
+            let filename = `tgmsgmonitor_backup_${Date.now()}.${type}`;
+            const disposition = res.headers.get('content-disposition');
+            if (disposition && disposition.indexOf('filename=') !== -1) {
+              const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+              if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+              }
+            }
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            this.showToast(this.lang === 'zh' ? '备份文件下载已开始' : 'Backup download started', 'success');
+          } catch (e) {
+            this.showToast(e.message || (this.lang === 'zh' ? '导出备份失败' : 'Export backup failed'), 'error');
+          } finally {
+            this.exportingBackup = false;
+          }
+        },
+
+        async handleBackupFileSelect(event) {
+          const file = event.target.files ? event.target.files[0] : null;
+          if (!file) return;
+          await this.setBackupFile(file);
+        },
+
+        async handleBackupDrop(event) {
+          const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+          if (!file) return;
+          await this.setBackupFile(file);
+        },
+
+        async setBackupFile(file) {
+          this.backupFile = file;
+          this.backupFileName = file.name;
+          const sizeKb = (file.size / 1024).toFixed(1);
+          this.backupFileSize = sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(2)} MB` : `${sizeKb} KB`;
+          this.backupError = '';
+          this.backupPreview = null;
+          await this.generateBackupPreview();
+        },
+
+        async generateBackupPreview() {
+          this.previewingBackup = true;
+          this.backupError = '';
+          try {
+            const formData = new FormData();
+            if (this.backupImportMode === 'file') {
+              if (!this.backupFile) return;
+              formData.append('file', this.backupFile);
+            } else {
+              if (!this.backupJsonText.trim()) return;
+              formData.append('json_content', this.backupJsonText.trim());
+            }
+            const res = await this.apiFetch('/api/system/backup/preview', {
+              method: 'POST',
+              body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.detail || (this.lang === 'zh' ? '解析备份文件失败' : 'Failed to parse backup'));
+            }
+            this.backupPreview = data;
+            this.$nextTick(() => lucide.createIcons());
+          } catch (e) {
+            this.backupError = e.message || (this.lang === 'zh' ? '解析备份内容失败' : 'Failed to parse backup');
+            this.backupPreview = null;
+          } finally {
+            this.previewingBackup = false;
+          }
+        },
+
+        async executeBackupImport() {
+          if (this.backupImportMode === 'file' && !this.backupFile) {
+            this.showToast(this.lang === 'zh' ? '请先选择备份文件' : 'Please select a backup file first', 'error');
+            return;
+          }
+          if (this.backupImportMode === 'text' && !this.backupJsonText.trim()) {
+            this.showToast(this.lang === 'zh' ? '请先输入 JSON 配置内容' : 'Please input JSON content first', 'error');
+            return;
+          }
+          const confirmMsg = this.lang === 'zh' 
+            ? '确认导入该备份并覆盖当前配置吗？（系统将自动创建现有配置的安全快照备份）' 
+            : 'Confirm importing this backup? Current config will be overwritten (a safety snapshot will be created automatically).';
+          if (!confirm(confirmMsg)) {
+            return;
+          }
+          this.importingBackup = true;
+          try {
+            const formData = new FormData();
+            if (this.backupImportMode === 'file') {
+              formData.append('file', this.backupFile);
+            } else {
+              formData.append('json_content', this.backupJsonText.trim());
+            }
+            formData.append('preserve_password', this.preservePassword ? 'true' : 'false');
+            formData.append('preserve_server', this.preserveServer ? 'true' : 'false');
+            formData.append('auto_reload', this.autoReload ? 'true' : 'false');
+
+            const res = await this.apiFetch('/api/system/backup/import', {
+              method: 'POST',
+              body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.detail || (this.lang === 'zh' ? '导入配置失败' : 'Failed to import backup'));
+            }
+            this.showToast(data.message || (this.lang === 'zh' ? '配置导入成功并已应用生效' : 'Configuration imported successfully'), 'success');
+            this.closeBackupModal();
+            // 刷新全站数据
+            await this.refreshData();
+          } catch (e) {
+            this.showToast(e.message || (this.lang === 'zh' ? '导入配置失败' : 'Failed to import backup'), 'error');
+          } finally {
+            this.importingBackup = false;
           }
         },
 

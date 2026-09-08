@@ -3,9 +3,12 @@ import json
 import asyncio
 import re
 from typing import List, Dict, Any, Optional, Tuple
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Depends, Header, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Depends, Header, Request, UploadFile, File, Form, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+import io
+import zipfile
+import shutil
 from pydantic import BaseModel, Field
 from telethon import TelegramClient, events
 from telethon.errors import (
@@ -34,7 +37,9 @@ if hasattr(time, "tzset"):
 # 基础目录配置
 CONFIG_PATH = "config.json"
 SESSIONS_DIR = "sessions"
+BACKUP_DIR = "backups"
 os.makedirs(SESSIONS_DIR, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # 内存缓存，保存 username 到 Telegram 数字 ID 的映射
 username_to_id_cache: Dict[str, int] = {}
@@ -986,6 +991,46 @@ class TelegramManager:
             except Exception:
                 pass
         logger.info("所有 Telegram 客户端连接已关闭。")
+
+    async def reload_accounts(self, new_config: dict):
+        """配置更新或导入后热重载账号状态与监听客户端"""
+        new_accounts = new_config.get("accounts", [])
+        new_active_phones = {acc["phone"]: acc for acc in new_accounts if acc.get("is_active")}
+
+        # 1. 停用不再处于激活状态或被删除的客户端
+        for phone, client in list(self.active_clients.items()):
+            if phone not in new_active_phones:
+                logger.info(f"配置重载：正在关闭并移除停用账号 {phone}")
+                try:
+                    await client.disconnect()
+                except Exception as e:
+                    logger.debug(f"关闭账号 {phone} 异常: {e}")
+                self.active_clients.pop(phone, None)
+
+        # 2. 尝试启动新增的或未连接的已激活账号
+        for phone, acc in new_active_phones.items():
+            if phone not in self.active_clients:
+                api_id = acc.get("api_id")
+                api_hash = acc.get("api_hash")
+                session_path = os.path.join(SESSIONS_DIR, f"session_{phone}")
+                if os.path.exists(f"{session_path}.session"):
+                    logger.info(f"配置重载：正在初始化启动账号 {phone}...")
+                    try:
+                        client = TelegramClient(session_path, api_id, api_hash, connection_retries=None, retry_delay=5)
+                        try:
+                            await client.connect()
+                        except Exception as conn_e:
+                            logger.warning(f"账号 {phone} 初始连接未就绪: {conn_e}")
+                        self.active_clients[phone] = client
+                        self.register_handlers(phone, client)
+                        if client.is_connected() and await client.is_user_authorized():
+                            logger.info(f"账号 {phone} 重载监听成功。")
+                    except Exception as init_e:
+                        logger.error(f"重载账号 {phone} 失败: {init_e}")
+
+        # 3. 清理规则防抖记录
+        self.rule_debounce_until.clear()
+        logger.info("已完成 Telegram 账号与规则状态热重载。")
 
 # ----------------- 待办日期推算与守护管理器 -----------------
 
@@ -2467,3 +2512,346 @@ async def check_update():
 async def trigger_update():
     """主动触发系统在线更新"""
     return await trigger_system_update()
+
+# ----------------- 配置备份与导入应用配置 -----------------
+
+def safe_extract_session_file(zf: zipfile.ZipFile, zip_info: zipfile.ZipInfo, target_dir: str):
+    """安全解压 session 文件，防止 Zip Slip 路径遍历漏洞"""
+    filename = os.path.basename(zip_info.filename)
+    if not filename.endswith(".session") or not filename.startswith("session_"):
+        return
+    # 确保没有包含上级目录
+    target_path = os.path.join(target_dir, filename)
+    target_path = os.path.abspath(target_path)
+    base_dir = os.path.abspath(target_dir)
+    if not target_path.startswith(base_dir + os.sep):
+        logger.warning(f"检测到潜在的非法 Zip 路径跳跃: {zip_info.filename}")
+        return
+    with zf.open(zip_info) as source, open(target_path, "wb") as target:
+        shutil.copyfileobj(source, target)
+    logger.info(f"已恢复 Session 会话文件: {filename}")
+
+def parse_and_validate_backup_data(file_bytes: Optional[bytes] = None, json_text: Optional[str] = None) -> Dict[str, Any]:
+    """解析并校验备份文件/文本内容，返回类型、配置及统计摘要"""
+    is_zip = False
+    config_dict = None
+    session_files_in_zip = []
+    meta_info = {}
+
+    if file_bytes:
+        if file_bytes.startswith(b"PK\x03\x04"):
+            # 是 ZIP 文件
+            is_zip = True
+            try:
+                with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as zf:
+                    # 查找 config.json
+                    cfg_member = None
+                    for name in zf.namelist():
+                        basename = os.path.basename(name)
+                        if basename == "config.json":
+                            cfg_member = name
+                        elif basename.endswith(".session") and basename.startswith("session_"):
+                            session_files_in_zip.append(basename)
+                        elif basename == "backup_meta.json":
+                            try:
+                                meta_info = json.loads(zf.read(name).decode("utf-8"))
+                            except Exception:
+                                pass
+                    if not cfg_member:
+                        raise ValueError("备份 ZIP 包中未找到有效的 config.json 配置文件。")
+                    raw_cfg_text = zf.read(cfg_member).decode("utf-8")
+                    config_dict = json.loads(raw_cfg_text)
+            except zipfile.BadZipFile:
+                raise ValueError("上传的文件并非合法的 ZIP 压缩包或已损坏。")
+        else:
+            # 尝试作为 JSON 解析
+            try:
+                raw_cfg_text = file_bytes.decode("utf-8")
+                config_dict = json.loads(raw_cfg_text)
+            except UnicodeDecodeError:
+                raise ValueError("文件编码异常，仅支持 UTF-8 编码的 JSON 文件或 ZIP 压缩包。")
+            except json.JSONDecodeError as jde:
+                raise ValueError(f"JSON 文件格式解析失败: {jde}")
+    elif json_text and json_text.strip():
+        try:
+            config_dict = json.loads(json_text.strip())
+        except json.JSONDecodeError as jde:
+            raise ValueError(f"输入的 JSON 内容格式错误: {jde}")
+    else:
+        raise ValueError("未提供任何可供解析的备份文件或 JSON 内容。")
+
+    # 如果存在顶层包裹结构 {"config": ...}，则提取实际配置
+    if isinstance(config_dict, dict) and "config" in config_dict and isinstance(config_dict["config"], dict):
+        if not meta_info and "exported_at" in config_dict:
+            meta_info["exported_at"] = config_dict.get("exported_at")
+        config_dict = config_dict["config"]
+
+    if not isinstance(config_dict, dict):
+        raise ValueError("配置文件根结构必须为 JSON Object 对象。")
+
+    # 结构完整性校验与统计
+    rules = config_dict.get("rules", [])
+    todos = config_dict.get("todos", [])
+    accounts = config_dict.get("accounts", [])
+
+    if not isinstance(rules, list):
+        raise ValueError("配置中的 'rules' (规则列表) 格式错误，必须为数组列表。")
+    if not isinstance(todos, list):
+        raise ValueError("配置中的 'todos' (待办列表) 格式错误，必须为数组列表。")
+    if not isinstance(accounts, list):
+        raise ValueError("配置中的 'accounts' (账号列表) 格式错误，必须为数组列表。")
+
+    global_wh = config_dict.get("global_webhook") or {}
+    offline_wh = config_dict.get("offline_webhook") or {}
+    todo_wh = config_dict.get("todo_webhook") or {}
+    global_bk = config_dict.get("global_bark") or {}
+    offline_bk = config_dict.get("offline_bark") or {}
+    todo_bk = config_dict.get("todo_bark") or {}
+
+    stats = {
+        "rules_count": len(rules),
+        "todos_count": len(todos),
+        "accounts_count": len(accounts),
+        "session_files_count": len(session_files_in_zip) if is_zip else 0,
+        "session_files": session_files_in_zip if is_zip else [],
+        "has_global_webhook": bool(global_wh.get("url")),
+        "has_offline_webhook": bool(offline_wh.get("url")),
+        "has_todo_webhook": bool(todo_wh.get("url")),
+        "has_global_bark": bool(global_bk.get("device_key")),
+        "has_offline_bark": bool(offline_bk.get("device_key")),
+        "has_todo_bark": bool(todo_bk.get("device_key")),
+        "exported_at": meta_info.get("exported_at") or ""
+    }
+
+    warnings = []
+    if is_zip and len(accounts) > 0 and len(session_files_in_zip) == 0:
+        warnings.append("备份包中包含账号配置，但未发现配套的 Session 登录凭据文件。")
+    if not rules and not todos:
+        warnings.append("该备份配置中未包含任何监控规则和待办事项。")
+
+    return {
+        "is_zip": is_zip,
+        "config": config_dict,
+        "stats": stats,
+        "warnings": warnings,
+        "session_files": session_files_in_zip
+    }
+
+@app.get("/api/system/backup/export", dependencies=[Depends(verify_token)])
+async def export_system_backup(type: str = "json"):
+    """导出系统配置备份 (json) 或全量数据迁移包 (zip)"""
+    config = await config_manager.get_config()
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    now_human = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    if type.lower() == "zip":
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # 写入完整 config.json
+            zf.writestr("config.json", json.dumps(config, indent=2, ensure_ascii=False))
+            # 写入元数据
+            meta = {
+                "app": "tgMsgMonitor",
+                "version": 1,
+                "exported_at": now_human,
+                "accounts_count": len(config.get("accounts", [])),
+                "rules_count": len(config.get("rules", [])),
+                "todos_count": len(config.get("todos", []))
+            }
+            zf.writestr("backup_meta.json", json.dumps(meta, indent=2, ensure_ascii=False))
+            # 写入 session 凭证
+            if os.path.exists(SESSIONS_DIR):
+                for item in os.listdir(SESSIONS_DIR):
+                    if item.endswith(".session") and item.startswith("session_"):
+                        fpath = os.path.join(SESSIONS_DIR, item)
+                        if os.path.isfile(fpath):
+                            zf.write(fpath, arcname=f"sessions/{item}")
+        buf.seek(0)
+        filename = f"tgmsgmonitor_full_backup_{now_str}.zip"
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    else:
+        export_payload = {
+            "app": "tgMsgMonitor",
+            "version": 1,
+            "exported_at": now_human,
+            "config": config
+        }
+        json_content = json.dumps(export_payload, indent=2, ensure_ascii=False)
+        filename = f"tgmsgmonitor_config_{now_str}.json"
+        return Response(
+            content=json_content.encode("utf-8"),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+@app.post("/api/system/backup/preview", dependencies=[Depends(verify_token)])
+async def preview_system_backup(request: Request):
+    """解析并预览待导入备份包的配置体检与统计数据"""
+    content_type = request.headers.get("content-type", "")
+    file_bytes = None
+    json_content = None
+
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if uploaded_file and hasattr(uploaded_file, "read"):
+            file_bytes = await uploaded_file.read()
+        json_content = form.get("json_content")
+    elif "application/json" in content_type:
+        body = await request.json()
+        if isinstance(body, dict):
+            json_content = body.get("json_content") or json.dumps(body)
+        elif isinstance(body, str):
+            json_content = body
+    else:
+        raw = await request.body()
+        if raw.startswith(b"PK\x03\x04"):
+            file_bytes = raw
+        else:
+            json_content = raw.decode("utf-8", errors="ignore")
+
+    try:
+        parsed = parse_and_validate_backup_data(file_bytes=file_bytes, json_text=json_content)
+        return {
+            "status": "success",
+            "valid": True,
+            "type": "zip" if parsed["is_zip"] else "json",
+            "stats": parsed["stats"],
+            "warnings": parsed["warnings"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/system/backup/import", dependencies=[Depends(verify_token)])
+async def import_system_backup(request: Request):
+    """执行配置备份导入与热重载应用"""
+    content_type = request.headers.get("content-type", "")
+    file_bytes = None
+    json_content = None
+    preserve_password = True
+    preserve_server = True
+    auto_reload = True
+
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if uploaded_file and hasattr(uploaded_file, "read"):
+            file_bytes = await uploaded_file.read()
+        json_content = form.get("json_content")
+        if "preserve_password" in form:
+            preserve_password = str(form.get("preserve_password")).lower() in ("true", "1", "yes")
+        if "preserve_server" in form:
+            preserve_server = str(form.get("preserve_server")).lower() in ("true", "1", "yes")
+        if "auto_reload" in form:
+            auto_reload = str(form.get("auto_reload")).lower() in ("true", "1", "yes")
+    elif "application/json" in content_type:
+        body = await request.json()
+        if isinstance(body, dict):
+            json_content = body.get("json_content")
+            if not json_content and ("rules" in body or "config" in body or "accounts" in body):
+                json_content = json.dumps(body)
+            if "preserve_password" in body:
+                preserve_password = bool(body["preserve_password"])
+            if "preserve_server" in body:
+                preserve_server = bool(body["preserve_server"])
+            if "auto_reload" in body:
+                auto_reload = bool(body["auto_reload"])
+    else:
+        raw = await request.body()
+        if raw.startswith(b"PK\x03\x04"):
+            file_bytes = raw
+        else:
+            json_content = raw.decode("utf-8", errors="ignore")
+
+    try:
+        parsed = parse_and_validate_backup_data(file_bytes=file_bytes, json_text=json_content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    imported_cfg = parsed["config"]
+    is_zip = parsed["is_zip"]
+    stats = parsed["stats"]
+
+    # 1. 制作当前 config.json 的本地时间戳快照安全备份
+    now_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+    current_cfg = await config_manager.get_config()
+    snapshot_filename = f"config_backup_before_import_{now_tag}.json"
+    snapshot_path = os.path.join(BACKUP_DIR, snapshot_filename)
+    try:
+        with open(snapshot_path, "w", encoding="utf-8") as f:
+            json.dump(current_cfg, f, indent=2, ensure_ascii=False)
+        with open(f"{CONFIG_PATH}.bak", "w", encoding="utf-8") as f:
+            json.dump(current_cfg, f, indent=2, ensure_ascii=False)
+        logger.info(f"导入配置前已生成当前配置快照备份: {snapshot_filename}")
+
+        # 清理超过 20 个的历史快照
+        existing_backups = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith("config_backup_before_import_")])
+        if len(existing_backups) > 20:
+            for old_b in existing_backups[:-20]:
+                try:
+                    os.remove(os.path.join(BACKUP_DIR, old_b))
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"生成配置快照备份文件失败: {e}")
+
+    # 2. 若为 ZIP 包，安全恢复 session 凭据文件
+    restored_sessions_count = 0
+    if is_zip and file_bytes:
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as zf:
+                for zip_info in zf.infolist():
+                    basename = os.path.basename(zip_info.filename)
+                    if basename.endswith(".session") and basename.startswith("session_"):
+                        safe_extract_session_file(zf, zip_info, SESSIONS_DIR)
+                        restored_sessions_count += 1
+        except Exception as e:
+            logger.error(f"恢复 Session 会话文件时出错: {e}")
+
+    # 3. 字段保护与合并
+    if preserve_password:
+        imported_cfg["admin_password"] = current_cfg.get("admin_password", "admin")
+    elif "admin_password" not in imported_cfg:
+        imported_cfg["admin_password"] = current_cfg.get("admin_password", "admin")
+
+    if preserve_server:
+        imported_cfg["server"] = current_cfg.get("server", {"host": "0.0.0.0", "port": 8010})
+    elif "server" not in imported_cfg:
+        imported_cfg["server"] = current_cfg.get("server", {"host": "0.0.0.0", "port": 8010})
+
+    # 补齐关键基础字段
+    if "accounts" not in imported_cfg or not isinstance(imported_cfg["accounts"], list):
+        imported_cfg["accounts"] = []
+    if "rules" not in imported_cfg or not isinstance(imported_cfg["rules"], list):
+        imported_cfg["rules"] = []
+    if "todos" not in imported_cfg or not isinstance(imported_cfg["todos"], list):
+        imported_cfg["todos"] = []
+    if "global_webhook" not in imported_cfg or not isinstance(imported_cfg["global_webhook"], dict):
+        imported_cfg["global_webhook"] = {"url": "", "timeout": 10, "method": "POST", "custom_body": ""}
+    if "offline_webhook" not in imported_cfg or not isinstance(imported_cfg["offline_webhook"], dict):
+        imported_cfg["offline_webhook"] = {"url": "", "timeout": 10, "method": "POST", "custom_body": ""}
+    if "todo_webhook" not in imported_cfg or not isinstance(imported_cfg["todo_webhook"], dict):
+        imported_cfg["todo_webhook"] = {"url": "", "timeout": 10, "method": "POST", "custom_body": ""}
+
+    # 4. 持久化保存并更新内存配置
+    await config_manager.save_config(imported_cfg)
+    logger.info("已成功保存并应用导入的新配置。")
+
+    # 5. 热重载运行状态
+    if auto_reload:
+        try:
+            await tg_manager.reload_accounts(imported_cfg)
+        except Exception as e:
+            logger.error(f"热重载 Telegram 客户端异常: {e}")
+
+    stats["restored_sessions_count"] = restored_sessions_count
+    return {
+        "status": "success",
+        "message": "配置导入成功并已应用生效！",
+        "snapshot_file": snapshot_filename,
+        "stats": stats
+    }

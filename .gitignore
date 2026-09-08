@@ -9,6 +9,8 @@ venv/
 
 # 系统敏感数据与授权 session (绝对不能提交至公开仓库)
 config.json
+*.bak
+backups/
 sessions/
 *.session
 *.session-journal
