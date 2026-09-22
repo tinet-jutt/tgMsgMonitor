@@ -662,13 +662,16 @@
                     <!-- 绑定账号列表 -->
                     <div class="flex flex-wrap items-center gap-1.5">
                       <span class="text-xs text-gray-500" x-text="lang === 'zh' ? '执行账号:' : 'Accounts:'"></span>
-                      <template x-if="rule.accounts.includes('all') || rule.accounts.length === 0">
+                      <template x-if="rule.accounts.includes('all')">
                         <span class="inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20 leading-none" x-text="lang === 'zh' ? '所有账号' : 'All accounts'"></span>
                       </template>
-                      <template x-if="!rule.accounts.includes('all')">
+                      <template x-if="!rule.accounts.includes('all') && rule.accounts.length > 0">
                         <template x-for="p in rule.accounts" :key="p">
                           <span class="inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-brand-border text-gray-300 font-medium leading-none" x-text="p"></span>
                         </template>
+                      </template>
+                      <template x-if="!rule.accounts.includes('all') && rule.accounts.length === 0">
+                        <span class="inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-semibold border border-amber-500/20 leading-none" x-text="lang === 'zh' ? '未绑定账号' : 'No accounts'"></span>
                       </template>
                     </div>
                   </div>
@@ -3991,14 +3994,18 @@
             const res = await this.apiFetch(`/api/accounts/${encodeURIComponent(phone)}`, {
               method: "DELETE"
             });
+            const data = await res.json();
             if (res.ok) {
-              this.showToast("账号已安全移除");
-              this.fetchAccounts();
+              this.showToast(data.message || (this.lang === 'zh' ? "账号已安全移除" : "Account removed safely"));
+              await Promise.all([
+                this.fetchAccounts(),
+                this.fetchRules()
+              ]);
             } else {
-              this.showToast("删除失败", "error");
+              this.showToast(data.detail || (this.lang === 'zh' ? "删除失败" : "Delete failed"), "error");
             }
           } catch (e) {
-            this.showToast("请求失败", "error");
+            this.showToast(this.lang === 'zh' ? "请求失败" : "Request failed", "error");
           }
         },
 

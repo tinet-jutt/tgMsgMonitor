@@ -25,6 +25,8 @@ import httpx
 import secrets
 import time
 
+from app.config_utils import remove_account_rule_bindings
+
 # 确保全局默认时区为 Asia/Shanghai (UTC+8)
 if "TZ" not in os.environ:
     os.environ["TZ"] = "Asia/Shanghai"
@@ -1658,11 +1660,14 @@ async def delete_account(phone: str):
     phone = phone.strip()
     config = await config_manager.get_config()
     
-    # 1. 从配置中移除
+    # 1. 从账号配置和显式绑定该账号的监控规则中移除
     new_accounts = [a for a in config["accounts"] if a["phone"] != phone]
     if len(new_accounts) == len(config["accounts"]):
         raise HTTPException(status_code=404, detail="未找到该账号配置。")
     config["accounts"] = new_accounts
+
+    updated_rules_count = remove_account_rule_bindings(config.get("rules", []), phone)
+
     await config_manager.save_config(config)
 
     # 2. 从活动池中移除并断开
@@ -1692,7 +1697,14 @@ async def delete_account(phone: str):
         except Exception as e:
             logger.warning(f"清除 Session 文件失败: {e}")
 
-    return {"status": "success", "message": "账号已删除并清理。"}
+    message = "账号已删除并清理。"
+    if updated_rules_count:
+        message = f"账号已删除，并已从 {updated_rules_count} 条监控规则中移除。"
+    return {
+        "status": "success",
+        "message": message,
+        "updated_rules_count": updated_rules_count
+    }
 
 # --- 全局 Webhook 配置 API ---
 
