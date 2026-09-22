@@ -25,7 +25,11 @@ import httpx
 import secrets
 import time
 
-from app.config_utils import remove_account_rule_bindings
+from app.config_utils import (
+    remove_account_rule_bindings,
+    resolve_app_version,
+    resolve_workflow_build_state,
+)
 
 # 确保全局默认时区为 Asia/Shanghai (UTC+8)
 if "TZ" not in os.environ:
@@ -2321,9 +2325,10 @@ async def trigger_test_todo(todo_id: str):
 
 # ----------------- 系统版本与在线更新检测/触发 API -----------------
 
-_raw_ver = os.getenv("APP_VERSION", "v1.2.0")
-APP_VERSION = "v1.2.0" if _raw_ver in ("main", "dev", "") else _raw_ver
+APP_VERSION_RAW = os.getenv("APP_VERSION", "dev")
 APP_COMMIT_SHA = os.getenv("APP_COMMIT_SHA", "")
+APP_BUILD_TIME = os.getenv("APP_BUILD_TIME", "")
+APP_RELEASE_CHANNEL = os.getenv("APP_RELEASE_CHANNEL", "development")
 try:
     UPDATE_TRIGGER_COOLDOWN_SECONDS = max(30, int(os.getenv("UPDATE_TRIGGER_COOLDOWN_SECONDS", "120")))
 except ValueError:
@@ -2333,7 +2338,7 @@ _update_trigger_lock = asyncio.Lock()
 
 def get_current_version_info() -> Dict[str, str]:
     """获取当前系统运行的版本号与 Commit SHA"""
-    sha = APP_COMMIT_SHA
+    sha = APP_COMMIT_SHA.strip()
     if not sha or sha == "dev":
         try:
             import subprocess
@@ -2342,12 +2347,14 @@ def get_current_version_info() -> Dict[str, str]:
                 sha = out
         except Exception:
             pass
-    if not sha:
-        sha = "12363f1"
+    if sha == "dev":
+        sha = ""
     return {
-        "version": APP_VERSION,
+        "version": resolve_app_version(APP_VERSION_RAW, sha),
         "commit_sha": sha,
-        "commit_short": sha[:7] if sha else "unknown"
+        "commit_short": sha[:7] if sha else "unknown",
+        "build_time": APP_BUILD_TIME,
+        "release_channel": APP_RELEASE_CHANNEL
     }
 
 async def check_github_update() -> Dict[str, Any]:
@@ -2379,19 +2386,51 @@ async def check_github_update() -> Dict[str, Any]:
                     except Exception:
                         pass
 
-                has_update = (latest_sha[:7].lower() != current_sha[:7].lower()) if (latest_sha and current_sha) else False
+                comparison_available = bool(latest_sha and current_sha)
+                has_update = latest_sha.lower() != current_sha.lower() if comparison_available else False
+                image_build_state = {
+                    "image_ready": not has_update,
+                    "image_build_status": "current" if not has_update else "unknown",
+                    "image_build_conclusion": "success" if not has_update else "",
+                    "image_build_url": ""
+                }
+                if has_update:
+                    workflow_runs_url = (
+                        "https://api.github.com/repos/tinet-jutt/tgMsgMonitor/"
+                        "actions/workflows/docker-publish.yml/runs"
+                    )
+                    try:
+                        runs_resp = await client.get(
+                            workflow_runs_url,
+                            headers=headers,
+                            params={"head_sha": latest_sha, "event": "push", "per_page": 5},
+                        )
+                        if runs_resp.status_code == 200:
+                            workflow_runs = runs_resp.json().get("workflow_runs", [])
+                            image_build_state = resolve_workflow_build_state(workflow_runs, latest_sha)
+                        else:
+                            image_build_state["image_build_status"] = "api_error"
+                            logger.warning(f"GitHub Actions API 返回 HTTP {runs_resp.status_code}")
+                    except Exception as build_check_error:
+                        image_build_state["image_build_status"] = "api_error"
+                        logger.warning(f"检查镜像构建状态失败: {build_check_error}")
+
                 return {
                     "status": "success",
                     "has_update": has_update,
+                    "comparison_available": comparison_available,
                     "current_version": current["version"],
                     "current_commit": current_sha,
                     "current_commit_short": current["commit_short"],
+                    "current_build_time": current["build_time"],
+                    "current_release_channel": current["release_channel"],
                     "latest_commit": latest_sha,
                     "latest_commit_short": latest_sha[:7] if latest_sha else "",
                     "commit_message": message,
                     "commit_date": date_str,
                     "commit_url": data.get("html_url", ""),
-                    "check_time": format_datetime()
+                    "check_time": format_datetime(),
+                    **image_build_state
                 }
             else:
                 return {
@@ -2399,7 +2438,9 @@ async def check_github_update() -> Dict[str, Any]:
                     "has_update": False,
                     "error": f"GitHub API 返回状态码 {resp.status_code}",
                     "current_version": current["version"],
-                    "current_commit_short": current["commit_short"]
+                    "current_commit_short": current["commit_short"],
+                    "current_build_time": current["build_time"],
+                    "current_release_channel": current["release_channel"]
                 }
     except Exception as e:
         logger.error(f"检查更新异常: {e}")
@@ -2408,7 +2449,9 @@ async def check_github_update() -> Dict[str, Any]:
             "has_update": False,
             "error": f"连接 GitHub 失败: {str(e)}",
             "current_version": current["version"],
-            "current_commit_short": current["commit_short"]
+            "current_commit_short": current["commit_short"],
+            "current_build_time": current["build_time"],
+            "current_release_channel": current["release_channel"]
         }
 
 def _local_update_script() -> Optional[str]:
@@ -2435,6 +2478,40 @@ async def trigger_system_update() -> Dict[str, Any]:
                 "mode": "lock",
                 "message": "更新请求已在处理中，请等待当前更新完成后再试。"
             }
+
+        # 真正触发更新前重新校验目标 Commit 与镜像工作流，避免拉取到旧 latest。
+        update_state = await check_github_update()
+        if update_state.get("status") != "success":
+            return {
+                "status": "update_check_failed",
+                "mode": "preflight",
+                "completed": False,
+                "message": update_state.get("error") or "无法校验远程更新状态，未触发容器更新。"
+            }
+        if not update_state.get("comparison_available"):
+            return {
+                "status": "version_unknown",
+                "mode": "preflight",
+                "completed": False,
+                "message": "当前运行镜像缺少 Commit 元数据，无法安全执行在线更新。"
+            }
+        if not update_state.get("has_update"):
+            return {
+                "status": "up_to_date",
+                "mode": "preflight",
+                "completed": True,
+                "message": "当前运行的已是最新版本。"
+            }
+        if not update_state.get("image_ready"):
+            return {
+                "status": "image_not_ready",
+                "mode": "preflight",
+                "completed": False,
+                "message": "目标 Commit 的 Docker 镜像尚未构建成功，请稍后重新检测。",
+                "image_build_url": update_state.get("image_build_url", "")
+            }
+
+        target_commit = update_state.get("latest_commit", "")
         _last_update_trigger_at = now
 
         # 1. 优先使用 Watchtower HTTP API 触发容器镜像更新。
@@ -2451,6 +2528,7 @@ async def trigger_system_update() -> Dict[str, Any]:
                         "status": "accepted",
                         "mode": "watchtower",
                         "completed": False,
+                        "target_commit": target_commit,
                         "message": "更新指令已被 Watchtower 接受，正在拉取镜像并重建容器；服务恢复后会自动校验运行版本。"
                     }
                 logger.warning(f"Watchtower API 返回 HTTP {resp.status_code}")
@@ -2493,6 +2571,7 @@ async def trigger_system_update() -> Dict[str, Any]:
                             "status": "accepted",
                             "mode": "local-compose",
                             "completed": False,
+                            "target_commit": target_commit,
                             "message": "代码与镜像更新流程已启动，服务恢复后会自动校验运行版本。"
                         }
                     logger.error("项目更新脚本执行失败，未报告为更新成功。")

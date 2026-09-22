@@ -88,6 +88,8 @@ The script serializes concurrent updates, pulls the GHCR image without a local b
 
 The external Watchtower service should keep `--cleanup`: it removes the image replaced by a successful Watchtower update. That option does not perform a general Docker prune, so the project script remains the canonical cleanup path for manual/fallback updates.
 
+CI embeds immutable build metadata into every image. Builds from `main` are displayed as `main-<short commit>`; builds from a `v*` tag keep that release tag. The update page compares the full running commit with GitHub `main`, waits for the target image workflow to succeed before enabling the update action, and only reports success after the restarted service exposes the expected commit.
+
 ---
 
 ### 📖 Placeholders Reference
@@ -224,6 +226,8 @@ git pull --ff-only origin main
 脚本会串行化并发更新，拉取 GHCR 镜像并以 `--no-build` 重建服务，清理同一 Compose 项目的孤儿/停止容器；通过 HTTP 健康检查后，再清理超出 7 天回滚窗口的无标签旧镜像和未使用构建缓存。`sessions` 与 `config.json` 不会被删除。
 
 外部 Watchtower 继续保留 `--cleanup`：它会在成功更新后删除被替换的旧镜像，但不是全局 Docker 垃圾回收，因此手动/兜底更新仍以 `scripts/update.sh` 为准。
+
+CI 会在每个镜像中写入不可变的构建元数据：`main` 分支构建显示为 `main-<短 Commit>`，`v*` 标签构建保留正式版本标签。在线更新页会使用完整 Commit 对比 GitHub `main`，目标镜像工作流成功后才允许触发更新，并且只在重启后服务实际运行预期 Commit 时才报告更新成功。
 
 ---
 

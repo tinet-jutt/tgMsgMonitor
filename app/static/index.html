@@ -130,7 +130,7 @@
                   :class="hasNewUpdate ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-sm' : 'bg-brand-border/40 border-transparent hover:bg-brand-border hover:text-white text-gray-300'"
                   :title="t('btn_check_update')">
             <i data-lucide="sparkles" class="w-3.5 h-3.5" :class="hasNewUpdate ? 'text-amber-400' : 'text-indigo-400'"></i>
-            <span class="font-mono text-[11px]" x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short ? '#' + systemVersion.commit_short : 'v1.2.0')"></span>
+            <span class="font-mono text-[11px]" x-text="systemVersionLabel()"></span>
             <template x-if="hasNewUpdate">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-400 absolute -top-0.5 -right-0.5 shadow-sm"></span>
             </template>
@@ -190,7 +190,7 @@
                 <span x-text="lang === 'zh' ? '系统版本' : 'Version'"></span>
               </div>
               <div class="flex items-center space-x-1 font-mono text-[11px]">
-                <span x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short ? '#' + systemVersion.commit_short : 'v1.2.0')"></span>
+                <span x-text="systemVersionLabel()"></span>
                 <template x-if="hasNewUpdate">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
                 </template>
@@ -2496,12 +2496,22 @@
       </div>
 
       <!-- 版本信息比对卡片 -->
-      <div class="grid grid-cols-2 gap-3 mb-4 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-xs">
         <div class="p-3 bg-brand-dark/70 rounded-xl border border-brand-border space-y-1">
           <span class="text-gray-400" x-text="t('lbl_current_version') + ':'"></span>
-          <div class="flex items-center space-x-1.5">
-            <span class="text-sm font-bold text-white font-mono" x-text="systemVersion.version && systemVersion.version !== 'main' ? systemVersion.version : (systemVersion.commit_short || 'v1.2.0')"></span>
-            <span class="px-1.5 py-0.5 rounded bg-brand-border text-gray-300 font-mono text-[11px]" x-text="systemVersion.commit_short"></span>
+          <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+            <span class="text-sm font-bold text-white font-mono" x-text="systemVersionLabel()"></span>
+            <span x-show="systemVersion.commit_short && systemVersion.commit_short !== 'unknown' && !systemVersionLabel().includes(systemVersion.commit_short)" class="px-1.5 py-0.5 rounded bg-brand-border text-gray-300 font-mono text-[11px]" x-text="systemVersion.commit_short"></span>
+          </div>
+          <div class="text-xs text-gray-500 space-y-1 pt-1 leading-relaxed">
+            <div x-show="systemVersion.release_channel">
+              <span x-text="t('lbl_release_channel') + ': '"></span>
+              <span class="font-mono text-gray-400" x-text="systemVersion.release_channel"></span>
+            </div>
+            <div x-show="systemVersion.build_time">
+              <span x-text="t('lbl_build_time') + ': '"></span>
+              <span class="font-mono text-gray-400 break-words" x-text="formatBuildTime(systemVersion.build_time)"></span>
+            </div>
           </div>
         </div>
         <div class="p-3 bg-brand-dark/70 rounded-xl border border-brand-border space-y-1">
@@ -2510,13 +2520,16 @@
             <template x-if="checkingUpdate">
               <span class="text-xs text-indigo-400 font-medium" x-text="t('status_checking')"></span>
             </template>
-            <template x-if="!checkingUpdate">
+            <template x-if="!checkingUpdate && !updateInfo.error && updateInfo.comparison_available !== false">
               <div class="flex items-center space-x-1.5">
                 <span class="text-sm font-bold font-mono" :class="updateInfo.has_update ? 'text-amber-400' : 'text-emerald-400'" x-text="updateInfo.latest_commit_short || systemVersion.commit_short"></span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
                       :class="updateInfo.has_update ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'"
                       x-text="updateInfo.has_update ? t('tag_has_update') : t('tag_latest')"></span>
               </div>
+            </template>
+            <template x-if="!checkingUpdate && (updateInfo.error || updateInfo.comparison_available === false)">
+              <span class="text-xs text-amber-300 font-medium" x-text="t('tag_unavailable')"></span>
             </template>
           </div>
         </div>
@@ -2562,6 +2575,22 @@
               </template>
             </div>
 
+            <!-- 目标 Commit 对应的镜像构建状态 -->
+            <div class="p-3 bg-brand-dark/60 rounded-xl border border-brand-border flex items-center justify-between gap-3 text-xs">
+              <div class="flex items-center space-x-2 min-w-0">
+                <span class="w-2 h-2 rounded-full shrink-0"
+                      :class="updateInfo.image_ready ? 'bg-emerald-400' : (updateInfo.image_build_status === 'completed' ? 'bg-rose-400' : 'bg-amber-400 animate-pulse')"></span>
+                <div class="min-w-0">
+                  <span class="text-gray-400" x-text="t('lbl_image_status') + ': '"></span>
+                  <span class="font-semibold" :class="updateInfo.image_ready ? 'text-emerald-300' : (updateInfo.image_build_status === 'completed' ? 'text-rose-300' : 'text-amber-300')" x-text="imageBuildStatusLabel()"></span>
+                </div>
+              </div>
+              <a x-show="updateInfo.image_build_url" :href="updateInfo.image_build_url" target="_blank" class="text-indigo-400 hover:text-indigo-300 hover:underline shrink-0 inline-flex items-center space-x-1">
+                <span>Actions</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+
             <!-- 主动更新提示 -->
             <div class="p-3 bg-brand-dark/50 rounded-xl border border-brand-border text-xs text-gray-400 space-y-1">
               <div class="flex items-center space-x-1.5 text-gray-300 font-semibold">
@@ -2574,13 +2603,21 @@
         </template>
 
         <!-- 当前已是最新版本 -->
-        <template x-if="!updateInfo.has_update && !updateInfo.error">
+        <template x-if="!updateInfo.has_update && !updateInfo.error && updateInfo.comparison_available !== false">
           <div class="py-8 text-center space-y-2 border border-dashed border-brand-border rounded-xl">
             <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto mb-2">
               <i data-lucide="check-circle" class="w-5 h-5"></i>
             </div>
             <h4 class="text-sm font-bold text-white" x-text="t('msg_already_latest')"></h4>
             <p class="text-xs text-gray-400" x-text="t('lbl_last_checked') + ': ' + (updateInfo.check_time || '')"></p>
+          </div>
+        </template>
+
+        <!-- 运行镜像缺少 Commit 元数据，不能误报为最新 -->
+        <template x-if="!updateInfo.error && updateInfo.comparison_available === false">
+          <div class="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex items-start space-x-2">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+            <span x-text="t('msg_version_unknown')"></span>
           </div>
         </template>
 
@@ -2606,9 +2643,9 @@
           <button type="button" @click="showUpdateModal = false" class="px-4 py-2 bg-brand-border hover:bg-brand-border/80 text-gray-300 rounded-xl text-xs font-semibold transition" x-text="t('btn_cancel')"></button>
           
           <template x-if="updateInfo.has_update">
-            <button type="button" @click="triggerSystemUpdate()" :disabled="updatingSystem" class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5 active:scale-95 disabled:opacity-50">
+            <button type="button" @click="triggerSystemUpdate()" :disabled="updatingSystem || !updateInfo.image_ready" class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
               <i data-lucide="rocket" class="w-4 h-4"></i>
-              <span x-text="t('btn_start_update')"></span>
+              <span x-text="updateInfo.image_ready ? t('btn_start_update') : t('btn_wait_image')"></span>
             </button>
           </template>
         </div>
@@ -2834,19 +2871,30 @@
             modal_update_subtitle: "检测 GitHub 官方仓库最新版本并支持主动一键更新",
             lbl_current_version: "当前运行版本",
             lbl_latest_remote: "远程最新版本",
+            lbl_release_channel: "发布通道",
+            lbl_build_time: "构建时间",
             status_checking: "正在检测...",
             tag_has_update: "可更新",
             tag_latest: "最新",
+            tag_unavailable: "无法比对",
             status_connecting_github: "正在连接 GitHub API 获取最新 Commit 变更信息...",
             status_updating_title: "正在执行系统更新与重建",
             status_updating_desc: "已向更新服务触发指令，容器正在拉取最新 Docker 镜像并平滑重建重启，系统将自动检测服务恢复...",
             lbl_update_log: "新版本更新内容 (Commit Log)",
+            lbl_image_status: "镜像构建",
+            image_ready: "镜像已就绪",
+            image_building: "正在构建镜像",
+            image_failed: "镜像构建失败",
+            image_pending: "等待构建任务",
+            image_unknown: "镜像状态未知",
             lbl_update_tip_title: "主动更新说明",
-            lbl_update_tip_desc: "点击「立即开始更新」后，系统将自动触发拉取最新镜像并重启服务，过程大约需 10~30 秒，会话与数据将安全保留。",
+            lbl_update_tip_desc: "点击「立即开始更新」后，系统将自动拉取最新镜像并重启服务，通常需要 1~3 分钟；页面会校验实际运行的 Commit，会话与数据将安全保留。",
             msg_already_latest: "当前运行的已是最新版本，无需更新！",
+            msg_version_unknown: "当前运行镜像缺少 Commit 元数据，无法安全判定是否需要更新。请先使用新版 CI 构建镜像。",
             lbl_last_checked: "上次检测时间",
             btn_recheck_update: "重新检测",
             btn_start_update: "立即开始更新",
+            btn_wait_image: "等待镜像就绪",
             // Bark 通知渠道
             channel_webhook: "Webhook (HTTP)",
             channel_bark: "Bark (iOS / macOS)",
@@ -3108,15 +3156,30 @@
             modal_update_subtitle: "Check latest version from GitHub repository and trigger one-click update",
             lbl_current_version: "Current Version",
             lbl_latest_remote: "Latest Remote",
+            lbl_release_channel: "Release Channel",
+            lbl_build_time: "Build Time",
             status_checking: "Checking...",
             tag_has_update: "Update Available",
             tag_latest: "Latest",
+            tag_unavailable: "Unavailable",
             status_connecting_github: "Connecting to GitHub API to check latest commits...",
             status_updating_title: "Executing System Update & Recreation",
+            status_updating_desc: "The latest Docker image is being pulled and the service is restarting. The running commit will be verified automatically.",
+            lbl_update_log: "Release Changes (Commit Log)",
+            lbl_image_status: "Image Build",
+            image_ready: "Image Ready",
+            image_building: "Building Image",
+            image_failed: "Image Build Failed",
+            image_pending: "Waiting for Build",
+            image_unknown: "Image Status Unknown",
+            lbl_update_tip_title: "Online Update",
+            lbl_update_tip_desc: "The update normally takes 1-3 minutes. This page verifies the actual running commit before reporting success; sessions and configuration remain persisted.",
             msg_already_latest: "Already running the latest version!",
+            msg_version_unknown: "The running image has no commit metadata, so its update status cannot be verified safely. Build it with the current CI workflow first.",
             lbl_last_checked: "Last Checked",
             btn_recheck_update: "Check Again",
             btn_start_update: "Start Update Now",
+            btn_wait_image: "Waiting for Image",
             // Bark Channels
             channel_webhook: "Webhook (HTTP)",
             channel_bark: "Bark (iOS / macOS)",
@@ -3371,13 +3434,18 @@
         },
 
         // 系统版本与在线更新状态
-        systemVersion: { version: "v1.2.0", commit_sha: "", commit_short: "" },
+        systemVersion: { version: "", commit_sha: "", commit_short: "", build_time: "", release_channel: "" },
         showUpdateModal: false,
         checkingUpdate: false,
         updatingSystem: false,
         hasNewUpdate: false,
         updateInfo: {
           has_update: false,
+          comparison_available: true,
+          image_ready: false,
+          image_build_status: "",
+          image_build_conclusion: "",
+          image_build_url: "",
           commit_message: "",
           commit_date: "",
           latest_commit_short: "",
@@ -4882,6 +4950,39 @@
         },
 
         // --- 系统版本与在线更新函数 ---
+        systemVersionLabel() {
+          const version = String(this.systemVersion.version || "").trim();
+          if (version && version !== "main" && version !== "dev") {
+            return version;
+          }
+          const commit = String(this.systemVersion.commit_short || "").trim();
+          if (commit && commit !== "unknown") {
+            return `${version === "main" ? "main" : "build"}-${commit}`;
+          }
+          return this.lang === "zh" ? "版本未知" : "Unknown";
+        },
+
+        formatBuildTime(value) {
+          if (!value) return "";
+          const parsed = new Date(value);
+          if (Number.isNaN(parsed.getTime())) return value;
+          return parsed.toLocaleString(this.lang === "zh" ? "zh-CN" : "en-US", { hour12: false });
+        },
+
+        imageBuildStatusLabel() {
+          if (this.updateInfo.image_ready) return this.t('image_ready');
+          const status = this.updateInfo.image_build_status || "unknown";
+          const conclusion = this.updateInfo.image_build_conclusion || "";
+          if (["queued", "in_progress", "requested", "waiting", "pending"].includes(status)) {
+            return this.t('image_building');
+          }
+          if (status === "completed" && conclusion !== "success") {
+            return this.t('image_failed');
+          }
+          if (status === "not_found") return this.t('image_pending');
+          return this.t('image_unknown');
+        },
+
         async fetchSystemVersion() {
           try {
             const res = await this.apiFetch("/api/system/version");
@@ -4905,8 +5006,14 @@
                 this.updateInfo = data;
                 this.hasNewUpdate = !!data.has_update;
                 if (data.current_version) {
-                  this.systemVersion.version = data.current_version;
-                  this.systemVersion.commit_short = data.current_commit_short;
+                  this.systemVersion = {
+                    ...this.systemVersion,
+                    version: data.current_version,
+                    commit_sha: data.current_commit || this.systemVersion.commit_sha,
+                    commit_short: data.current_commit_short,
+                    build_time: data.current_build_time || "",
+                    release_channel: data.current_release_channel || ""
+                  };
                 }
               } else {
                 this.updateInfo = {
@@ -4927,16 +5034,23 @@
         },
 
         async triggerSystemUpdate() {
+          if (!this.updateInfo.image_ready) {
+            this.showToast(this.lang === 'zh' ? "目标镜像尚未构建完成，请稍后重新检测" : "The target image is not ready. Check again shortly.", "info");
+            return;
+          }
           this.updatingSystem = true;
-          const expectedCommit = (this.updateInfo.latest_commit_short || "").toLowerCase();
+          const expectedCommit = (this.updateInfo.latest_commit || this.updateInfo.latest_commit_short || "").toLowerCase();
           try {
             const res = await this.apiFetch("/api/system/trigger-update", { method: "POST" });
             const data = await res.json();
             if (data.status === 'success' || data.status === 'accepted') {
               this.showToast(data.message);
               // 开始轮询服务重启恢复
-              this.pollSystemOnlineAfterUpdate(expectedCommit);
+              this.pollSystemOnlineAfterUpdate((data.target_commit || expectedCommit).toLowerCase());
             } else if (data.status === 'in_progress') {
+              this.updatingSystem = false;
+              this.showToast(data.message, "info");
+            } else if (['up_to_date', 'image_not_ready', 'version_unknown'].includes(data.status)) {
               this.updatingSystem = false;
               this.showToast(data.message, "info");
             } else if (data.status === 'manual_required') {
@@ -4958,7 +5072,7 @@
 
         pollSystemOnlineAfterUpdate(expectedCommit = "") {
           let retryCount = 0;
-          const maxRetries = 30; // 最多探测 60 秒
+          const maxRetries = 90; // 最多探测 180 秒，覆盖镜像拉取与容器重建
           let polling = false;
           let finished = false;
           const interval = setInterval(async () => {
@@ -4968,7 +5082,7 @@
             try {
               const token = localStorage.getItem('admin_token');
               const res = await fetch("/api/system/version", {
-                cache: "no-cache",
+                cache: "no-store",
                 headers: token ? { "Authorization": `Bearer ${token}` } : {}
               });
               if (res.status === 200) {
@@ -4987,6 +5101,8 @@
                 clearInterval(interval);
                 finished = true;
                 this.updatingSystem = false;
+                this.systemVersion = version;
+                this.hasNewUpdate = false;
                 this.showUpdateModal = false;
                 this.showToast(this.lang === 'zh' ? "系统已更新完毕并恢复运行！" : "System updated successfully!");
                 setTimeout(() => {
