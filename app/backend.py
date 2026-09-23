@@ -408,6 +408,8 @@ class TelegramManager:
         self.phone_code_hashes: Dict[str, str] = {}
         # 规则防抖截止时间缓存 {rule_id: debounce_until_timestamp}
         self.rule_debounce_until: Dict[str, float] = {}
+        # 规则防抖状态缓存 {rule_id: {"last_activity": float, "debounce_seconds": int, "until": float}}
+        self.rule_debounce_state: Dict[str, dict] = {}
 
     async def init_and_start_active_accounts(self):
         """服务启动时，自动启动所有已激活的 Telegram 客户端"""
@@ -735,15 +737,41 @@ class TelegramManager:
             debounce_seconds = rule.get("debounce_seconds", 0) or filters.get("debounce_seconds", 0) or 0
             if debounce_seconds > 0 and rule_id:
                 now = time.time()
-                debounce_until = self.rule_debounce_until.get(rule_id, 0)
-                
-                # 无论是否处于冷却期，符合条件的要发送消息均刷新重置该防抖时间
-                self.rule_debounce_until[rule_id] = now + debounce_seconds
-                
-                if now < debounce_until:
-                    remaining = int(debounce_until - now)
+                state = self.rule_debounce_state.get(rule_id)
+
+                # 防守：如果状态存在但规则配置的 debounce_seconds 发生变动（未走 API 同步时），动态校准
+                if state and state.get("debounce_seconds") != debounce_seconds:
+                    last_activity = state.get("last_activity", now)
+                    calibrated_until = last_activity + debounce_seconds
+                    if now >= calibrated_until:
+                        # 冷却期已过，清除旧状态
+                        self.clear_rule_debounce(rule_id)
+                        state = None
+                    else:
+                        state["debounce_seconds"] = debounce_seconds
+                        state["until"] = calibrated_until
+                        self.rule_debounce_until[rule_id] = calibrated_until
+
+                # 判断是否处于冷却期
+                if state and now < state.get("until", 0):
+                    # 处于冷却期内：按照规则“每条尝试发送的消息都会重新刷新重置防抖时间”
+                    state["last_activity"] = now
+                    state["until"] = now + debounce_seconds
+                    state["debounce_seconds"] = debounce_seconds
+                    self.rule_debounce_until[rule_id] = state["until"]
+
+                    remaining = int(state["until"] - now)
                     logger.info(f"规则 [{rule.get('name')}] 正在防抖冷却中 (剩余 {remaining} 秒)，防抖时间已重置为 {debounce_seconds} 秒，已拦截本次消息推送。")
                     continue
+                else:
+                    # 未处于冷却期（首次命中或冷却期已过）：
+                    # 放行本次消息推送，并开启新的防抖冷却周期
+                    self.rule_debounce_state[rule_id] = {
+                        "last_activity": now,
+                        "debounce_seconds": debounce_seconds,
+                        "until": now + debounce_seconds
+                    }
+                    self.rule_debounce_until[rule_id] = now + debounce_seconds
 
             # 5. 触发 Webhook
             rule_webhook = rule.get("webhook", {})
@@ -1036,7 +1064,58 @@ class TelegramManager:
 
         # 3. 清理规则防抖记录
         self.rule_debounce_until.clear()
+        self.rule_debounce_state.clear()
         logger.info("已完成 Telegram 账号与规则状态热重载。")
+
+    def update_rule_debounce(self, rule_id: str, new_debounce_seconds: int):
+        """当规则防抖时间调整时，动态更新冷却状态"""
+        if not rule_id:
+            return
+
+        # 1. 如果新防抖时间 <= 0，表示关闭防抖，立即清除该规则防抖状态并解除冷却
+        if new_debounce_seconds <= 0:
+            self.clear_rule_debounce(rule_id)
+            logger.info(f"规则 [{rule_id}] 已禁用防抖，冷却状态已立即解除并清除。")
+            return
+
+        state = self.rule_debounce_state.get(rule_id)
+        now = time.time()
+
+        # 2. 如果之前处于防抖冷却状态
+        if state:
+            last_activity = state.get("last_activity", now)
+            new_until = last_activity + new_debounce_seconds
+
+            # 若按照新的防抖时长，当前时间已经超过了新的冷却截止时间，说明冷却期已自然到期
+            if now >= new_until:
+                self.clear_rule_debounce(rule_id)
+                logger.info(f"规则 [{rule_id}] 防抖时间调整为 {new_debounce_seconds} 秒，冷却期已自然到期并立即解除。")
+            else:
+                # 仍在冷却中，动态更新截止时间与防抖时长
+                state["debounce_seconds"] = new_debounce_seconds
+                state["until"] = new_until
+                self.rule_debounce_until[rule_id] = new_until
+                remaining = int(new_until - now)
+                logger.info(f"规则 [{rule_id}] 防抖时间调整为 {new_debounce_seconds} 秒，新的冷却剩余时间为 {remaining} 秒。")
+        else:
+            # 兼容：如果只有 rule_debounce_until 缓存
+            old_until = self.rule_debounce_until.get(rule_id, 0)
+            if old_until > now:
+                self.rule_debounce_state[rule_id] = {
+                    "last_activity": now,
+                    "debounce_seconds": new_debounce_seconds,
+                    "until": now + new_debounce_seconds
+                }
+                self.rule_debounce_until[rule_id] = now + new_debounce_seconds
+            else:
+                self.clear_rule_debounce(rule_id)
+
+    def clear_rule_debounce(self, rule_id: str):
+        """清除指定规则的防抖状态缓存"""
+        if not rule_id:
+            return
+        self.rule_debounce_state.pop(rule_id, None)
+        self.rule_debounce_until.pop(rule_id, None)
 
 # ----------------- 待办日期推算与守护管理器 -----------------
 
@@ -2135,6 +2214,11 @@ async def update_rule(rule_id: str, updated_rule: RuleModel):
         
     config["rules"][index] = updated_rule.dict()
     await config_manager.save_config(config)
+
+    # 联动更新运行中的防抖冷却状态，使新防抖时间立即生效
+    new_debounce_seconds = updated_rule.debounce_seconds or (updated_rule.filters.debounce_seconds if hasattr(updated_rule.filters, 'debounce_seconds') else 0) or 0
+    tg_manager.update_rule_debounce(rule_id, new_debounce_seconds)
+
     return {"status": "success", "message": "规则更新成功！"}
 
 @app.delete("/api/rules/{rule_id}", dependencies=[Depends(verify_token)])
@@ -2148,6 +2232,10 @@ async def delete_rule(rule_id: str):
         
     config["rules"] = new_rules
     await config_manager.save_config(config)
+
+    # 清理该规则在运行中的防抖冷却状态
+    tg_manager.clear_rule_debounce(rule_id)
+
     return {"status": "success", "message": "规则删除成功！"}
 
 @app.post("/api/rules/{rule_id}/toggle", dependencies=[Depends(verify_token)])
@@ -2161,6 +2249,11 @@ async def toggle_rule(rule_id: str):
         
     rule["is_enabled"] = not rule.get("is_enabled", True)
     await config_manager.save_config(config)
+
+    # 如果停用该规则，立即清理其防抖状态
+    if not rule["is_enabled"]:
+        tg_manager.clear_rule_debounce(rule_id)
+
     status_str = "启用" if rule["is_enabled"] else "暂停"
     return {"status": "success", "message": f"规则已{status_str}。"}
 
